@@ -14,7 +14,8 @@ export const getRationAdvice = async (
   requirements: any
 ) => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    // Fix: Using named parameter for apiKey initialization as per guidelines
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const rationDetails = ration.map(item => {
       const feed = feedDb.find(f => f.id === item.feedId);
@@ -49,6 +50,7 @@ export const getRationAdvice = async (
       Cevabı profesyonel, yapıcı ve tamamen Türkçe olarak ver. Madde madde ve net konuş.
     `;
 
+    // Fix: model name matches guidelines
     const result = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
@@ -61,12 +63,11 @@ export const getRationAdvice = async (
     return result.text;
   } catch (error: any) {
     console.error("Gemini Analiz Hatası:", error);
-    // Kota veya API hatalarını kullanıcıya açıklayacak spesifik mesajlar
     if (error?.message?.includes('429')) {
-      return "HATA: API Kota sınırı aşıldı. Lütfen 1 dakika bekleyip tekrar deneyiniz.";
+      return "HATA: API Kota sınırı aşıldı. Lütfen yaklaşık 1 dakika bekleyip tekrar deneyiniz.";
     }
     if (error?.message?.includes('500') || error?.message?.includes('503')) {
-      return "HATA: Sunucu şu an yoğun veya ulaşılamıyor. Lütfen biraz sonra tekrar deneyiniz.";
+      return "HATA: Sunucu yoğunluğu. Lütfen biraz sonra tekrar deneyiniz.";
     }
     return `HATA: Analiz sırasında bir sorun oluştu (${error?.message || 'Bilinmeyen hata'}).`;
   }
@@ -81,7 +82,8 @@ export const getPerfectRationSuggestion = async (
   availableFeeds: Feed[]
 ) => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    // Fix: Using named parameter for apiKey initialization
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const feedList = availableFeeds.map(f => `${f.id}: ${f.name} (KM: %${f.dryMatter}, ME: ${f.metabolizableEnergy}, HP: %${f.crudeProtein})`).join('\n');
 
     const prompt = `
@@ -114,6 +116,7 @@ export const getPerfectRationSuggestion = async (
         }
       }
     });
+    // Fix: access .text property directly as per guidelines
     const text = response.text;
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -127,7 +130,8 @@ export const getPerfectRationSuggestion = async (
  */
 export const fetchCurrentMarketPrices = async (feeds: Feed[]) => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    // Fix: Using named parameter for apiKey initialization
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const feedNames = feeds.map(f => f.name).join(", ");
     const prompt = `Türkiye yem piyasası güncel kg fiyatlarını JSON formatında ver: {"yem_id": fiyat_number}. Yemler: ${feedNames}`;
 
@@ -135,9 +139,11 @@ export const fetchCurrentMarketPrices = async (feeds: Feed[]) => {
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        tools: [{googleSearch: {}}],
         responseMimeType: "application/json"
       }
     });
+    // Fix: access .text property directly
     const text = response.text;
     if (!text) return null;
     return JSON.parse(text.trim());

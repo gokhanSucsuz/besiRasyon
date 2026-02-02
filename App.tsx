@@ -1,35 +1,23 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
   Beef, 
   Settings, 
-  Plus, 
   Trash2, 
   Calculator, 
   Zap, 
-  ChevronRight, 
   Save, 
-  Info,
-  Activity,
   MessageSquare,
   RefreshCw,
-  Search,
   CheckCircle2,
   Tag,
-  ArrowLeft,
-  LayoutDashboard,
-  HelpCircle,
-  Wheat,
   Archive,
-  Calendar,
   Clock,
   ArrowUpRight,
   FileText,
-  X,
-  Check,
   Star,
   Award,
   TrendingUp,
@@ -38,12 +26,13 @@ import {
   Download,
   Upload,
   Printer,
-  ShieldCheck,
   Scale,
-  ZapOff,
   Sparkles,
   AlertCircle,
-  AlertTriangle
+  HelpCircle,
+  LayoutDashboard,
+  // Fix: Added missing Activity icon import
+  Activity
 } from 'lucide-react';
 import { AnimalCategory, AnimalProfile, Feed, RationItem, NutrientRequirements } from './types';
 import { BREEDS, FEEDS as INITIAL_FEEDS } from './constants';
@@ -52,7 +41,7 @@ import { saveRationRecord, getAllRecords, deleteRecord, SavedRecord, exportDatab
 
 const InfoLabel: React.FC<{ label: string; tooltip: string; className?: string }> = ({ label, tooltip, className }) => (
   <div className={`flex items-center gap-1.5 group/info cursor-help ${className}`}>
-    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest transition-colors group/info:hover:text-emerald-600">
+    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest transition-colors group-hover/info:text-emerald-600">
       {label}
     </label>
     <div className="relative">
@@ -66,7 +55,6 @@ const InfoLabel: React.FC<{ label: string; tooltip: string; className?: string }
 );
 
 const App: React.FC = () => {
-  // --- State ---
   const [activeTab, setActiveTab] = useState<'calculator' | 'prices' | 'history'>('calculator');
   const [feeds, setFeeds] = useState<Feed[]>(INITIAL_FEEDS);
   const [isPriceUpdating, setIsPriceUpdating] = useState(false);
@@ -95,7 +83,6 @@ const App: React.FC = () => {
   const [suggestion, setSuggestion] = useState<{explanation: string, items: RationItem[]} | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
 
-  // --- Effects ---
   useEffect(() => {
     updatePricesWithAI();
     loadHistory();
@@ -120,7 +107,8 @@ const App: React.FC = () => {
           pricePerKg: newPrices[f.id] || f.pricePerKg
         })));
         const now = new Date();
-        setPriceUpdatedDate(now.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
+        const dateStr = now.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        setPriceUpdatedDate(dateStr);
       }
     } catch (e) {
       console.error("Fiyat güncelleme hatası:", e);
@@ -129,7 +117,6 @@ const App: React.FC = () => {
     }
   };
 
-  // --- Calculations ---
   const requirements = useMemo<NutrientRequirements>(() => {
     const breed = BREEDS.find(b => b.id === profile.breedId) || BREEDS[0];
     let dmiFactor = profile.category === AnimalCategory.CATTLE ? 0.025 : 0.035;
@@ -183,9 +170,14 @@ const App: React.FC = () => {
     return Math.round((dmScore + energyScore + proteinScore + caScore + pScore) / 5);
   }, [totals, requirements, ration]);
 
-  // --- Handlers ---
+  const chartData = useMemo(() => [
+    { name: 'KM (kg)', Mevcut: totals.dm, Gereken: requirements.dryMatterIntake },
+    { name: 'Enerji (MJ)', Mevcut: totals.energy, Gereken: requirements.energy },
+    { name: 'Protein (g/10)', Mevcut: totals.protein / 10, Gereken: requirements.protein / 10 },
+    { name: 'Kalsiyum (g)', Mevcut: totals.ca, Gereken: requirements.calcium },
+    { name: 'Fosfor (g)', Mevcut: totals.p, Gereken: requirements.phosphorus },
+  ], [totals, requirements]);
 
-  // fix: Added handleExport function to export the database records as a JSON file.
   const handleExport = async () => {
     try {
       const json = await exportDatabase();
@@ -199,7 +191,6 @@ const App: React.FC = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Dışa aktarma hatası:", error);
       alert("Yedekleme dosyası oluşturulurken bir hata oluştu.");
     }
   };
@@ -209,8 +200,6 @@ const App: React.FC = () => {
     setIsSaving(true);
     try {
       const now = new Date();
-      const reportToSave = customAdvice || aiAdvice || undefined;
-      
       await saveRationRecord({
         timestamp: now.getTime(),
         dateStr: now.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -220,53 +209,50 @@ const App: React.FC = () => {
         totals,
         requirements,
         qualityScore,
-        aiAnalysisReport: reportToSave
+        aiAnalysisReport: customAdvice || aiAdvice || undefined
       });
       await loadHistory();
+      if (!customAdvice) {
+        alert("Rasyon başarıyla arşivlendi.");
+      }
       return true;
     } catch (e) {
-      console.error("Save error", e);
+      alert("Kayıt sırasında bir hata oluştu.");
       return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const getAdvice = async () => {
-    if (ration.length === 0) {
-      alert("Lütfen önce rasyona yem ekleyin.");
-      return;
+  // Fix: Implemented missing handleDeleteRecord function
+  const handleDeleteRecord = async (id: number) => {
+    if (window.confirm("Bu rasyonu arşivden silmek istediğinize emin misiniz?")) {
+      try {
+        await deleteRecord(id);
+        await loadHistory();
+      } catch (e) {
+        alert("Silme işlemi başarısız oldu.");
+      }
     }
-    
+  };
+
+  const getAdvice = async () => {
+    if (isAiLoading || ration.length === 0) return;
     setIsAiLoading(true);
     setAiAdvice(null);
     setAiError(null);
-    
     try {
       const breed = BREEDS.find(b => b.id === profile.breedId);
-      const adviceResult = await getRationAdvice(
-        profile, 
-        breed?.name || 'Bilinmeyen', 
-        ration, 
-        feeds, 
-        totals, 
-        requirements
-      );
-      
-      if (adviceResult && !adviceResult.startsWith('HATA:')) {
-        setAiAdvice(adviceResult);
-        // Başarılı analiz durumunda veri ve analizi birlikte kaydet
-        const saveOk = await handleSave(adviceResult);
-        if (saveOk) {
-          alert("Analiz tamamlandı ve rasyon otomatik olarak arşivlendi.");
-        }
-      } else {
-        const errorMsg = adviceResult || "Bilinmeyen bir hata oluştu.";
-        setAiError(errorMsg);
+      const advice = await getRationAdvice(profile, breed?.name || 'Bilinmeyen', ration, feeds, totals, requirements);
+      if (advice && advice.startsWith('HATA:')) {
+        setAiError(advice);
+      } else if (advice) {
+        setAiAdvice(advice);
+        await handleSave(advice);
+        alert("Analiz tamamlandı ve arşivlendi.");
       }
-    } catch (e: any) {
-      console.error("Advice Error:", e);
-      setAiError("Bağlantı sorunu veya kota sınırı nedeniyle analiz yapılamadı. Lütfen tekrar deneyiniz.");
+    } catch (e) {
+      setAiError("Teknik bir hata oluştu. Lütfen tekrar deneyiniz.");
     } finally {
       setIsAiLoading(false);
     }
@@ -276,87 +262,47 @@ const App: React.FC = () => {
     const breed = BREEDS.find(b => b.id === record.profile.breedId)?.name || 'Bilinmeyen';
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-
     const styles = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; background-color: white; }
+        body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
         .header { border-bottom: 4px solid #10b981; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
-        .title { font-size: 28px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: -1px; }
-        .section { margin-bottom: 30px; }
-        .section-title { font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #10b981; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 10px; }
-        .grid { display: grid; grid-template-cols: repeat(2, 1fr); gap: 20px; }
-        .card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; }
-        .label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-        .value { font-size: 16px; font-weight: 900; color: #1e293b; }
+        .section-title { font-size: 14px; font-weight: 900; text-transform: uppercase; color: #10b981; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { text-align: left; font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; padding: 10px; border-bottom: 2px solid #e2e8f0; }
-        td { padding: 12px 10px; font-size: 13px; font-weight: 700; border-bottom: 1px solid #f1f5f9; }
-        .total-row { background: #ecfdf5; font-weight: 900; }
-        .ai-report-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 25px; border-radius: 20px; font-size: 13px; color: #065f46; line-height: 1.7; margin-top: 10px; white-space: pre-wrap; }
-        .footer { margin-top: 50px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 20px; }
+        th { text-align: left; font-size: 10px; text-transform: uppercase; padding: 10px; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 12px 10px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+        .ai-report { background: #f0fdf4; padding: 20px; border-radius: 12px; font-size: 12px; white-space: pre-wrap; font-style: italic; }
       </style>
     `;
-
     const content = `
       <html>
         <head><title>Rasyon Raporu</title>${styles}</head>
         <body>
           <div class="header">
-            <div><div class="title">BesiRasyon <span style="color: #10b981">PRO</span></div></div>
-            <div style="text-align: right">
-              <div style="font-weight:900">Kalite Skoru: %${record.qualityScore}</div>
-              <div style="font-size:12px;color:#64748b">${record.dateStr}</div>
-            </div>
+            <div><h1 style="margin:0; font-size:24px;">BesiRasyon <span style="color:#10b981">PRO</span></h1></div>
+            <div style="text-align:right">Skor: %${record.qualityScore}<br/>${record.dateStr}</div>
           </div>
-          <div class="section">
-            <div class="section-title">Hayvan Bilgileri</div>
-            <div class="grid">
-              <div class="card"><div class="label">Irk</div><div class="value">${breed}</div></div>
-              <div class="card"><div class="label">Canlı Ağırlık</div><div class="value">${record.profile.weight} kg</div></div>
-              <div class="card"><div class="label">Hedef Artış</div><div class="value">${record.profile.dailyGain} kg/g</div></div>
-              <div class="card"><div class="label">Maliyet</div><div class="value">${record.totals.cost.toFixed(2)} TL</div></div>
-            </div>
+          <div class="section-title">Hayvan Bilgileri</div>
+          <div style="display:grid; grid-template-cols:1fr 1fr; gap:20px; margin-bottom:30px;">
+            <div style="background:#f8fafc; padding:15px; border-radius:10px;">${breed}<br/>${record.profile.weight} kg</div>
+            <div style="background:#f8fafc; padding:15px; border-radius:10px;">Hedef: ${record.profile.dailyGain} kg/g<br/>Maliyet: ${record.totals.cost.toFixed(2)} TL</div>
           </div>
-          <div class="section">
-            <div class="section-title">Rasyon İçeriği</div>
-            <table>
-              <thead><tr><th>Yem</th><th style="text-align:right">KG</th><th style="text-align:right">TL</th></tr></thead>
-              <tbody>
-                ${record.ration.map(item => {
-                  const feed = INITIAL_FEEDS.find(f => f.id === item.feedId);
-                  return `<tr><td>${feed?.name}</td><td style="text-align:right">${item.amountKg.toFixed(2)}</td><td style="text-align:right">${(item.amountKg * (feed?.pricePerKg || 0)).toFixed(2)}</td></tr>`;
-                }).join('')}
-                <tr class="total-row"><td>TOPLAM</td><td style="text-align:right">${record.ration.reduce((a,b)=>a+b.amountKg,0).toFixed(2)}</td><td style="text-align:right">${record.totals.cost.toFixed(2)}</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <div class="section-title">Rasyon İçeriği</div>
+          <table>
+            <thead><tr><th>Yem</th><th style="text-align:right">Miktar (kg)</th></tr></thead>
+            <tbody>
+              ${record.ration.map(item => `<tr><td>${INITIAL_FEEDS.find(f => f.id === item.feedId)?.name}</td><td style="text-align:right">${item.amountKg}</td></tr>`).join('')}
+            </tbody>
+          </table>
           ${record.aiAnalysisReport ? `
-          <div class="section">
-            <div class="section-title">AI Uzman Raporu</div>
-            <div class="ai-report-box">${record.aiAnalysisReport.replace(/\n/g, '<br/>')}</div>
-          </div>` : ''}
-          <div class="footer">BesiRasyon PRO © ${new Date().getFullYear()}</div>
+          <div class="section-title" style="margin-top:30px;">AI Uzman Analizi</div>
+          <div class="ai-report">${record.aiAnalysisReport}</div>` : ''}
           <script>window.print(); setTimeout(() => window.close(), 500);</script>
         </body>
       </html>
     `;
     printWindow.document.write(content);
     printWindow.document.close();
-  };
-
-  const chartData = useMemo(() => [
-    { name: 'KM (kg)', Mevcut: totals.dm, Gereken: requirements.dryMatterIntake },
-    { name: 'Enerji (MJ)', Mevcut: totals.energy, Gereken: requirements.energy },
-    { name: 'Protein (g/10)', Mevcut: totals.protein / 10, Gereken: requirements.protein / 10 },
-    { name: 'Kalsiyum (g)', Mevcut: totals.ca, Gereken: requirements.calcium },
-    { name: 'Fosfor (g)', Mevcut: totals.p, Gereken: requirements.phosphorus },
-  ], [totals, requirements]);
-
-  const handleDeleteRecord = async (id: number) => {
-    if (!confirm("Bu kaydı silmek istediğinize emin misiniz?")) return;
-    await deleteRecord(id);
-    await loadHistory();
   };
 
   const getScoreColor = (score: number) => {
@@ -366,13 +312,24 @@ const App: React.FC = () => {
     return 'text-red-500 bg-red-50 border-red-200';
   };
 
+  const getCategoryIcon = (category: AnimalCategory) => {
+    switch (category) {
+      case AnimalCategory.CATTLE: return <Beef className="w-6 h-6" />;
+      case AnimalCategory.SHEEP: return <Cloud className="w-6 h-6" />;
+      case AnimalCategory.GOAT: return <Mountain className="w-6 h-6" />;
+      // Fix: Used the now-imported Activity icon
+      default: return <Activity className="w-6 h-6" />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans text-slate-900">
-      {/* Header */}
       <header className="bg-slate-900 text-white py-6 px-4 sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-5">
-            <div className="bg-emerald-500 p-3 rounded-2xl"><Beef className="w-8 h-8" /></div>
+            <div className="bg-emerald-500 p-3 rounded-2xl cursor-pointer" onClick={() => setActiveTab('calculator')}>
+              <Beef className="w-8 h-8" />
+            </div>
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tighter">BesiRasyon <span className="text-emerald-400">PRO</span></h1>
               <div className="flex gap-4 mt-1">
@@ -385,7 +342,7 @@ const App: React.FC = () => {
             </div>
           </div>
           {activeTab === 'calculator' && (
-            <div className={`px-6 py-2 rounded-2xl border font-black ${getScoreColor(qualityScore)}`}>Skor: %{qualityScore}</div>
+            <div className={`px-6 py-2 rounded-2xl border font-black hidden md:block ${getScoreColor(qualityScore)}`}>Rasyon Skoru: %{qualityScore}</div>
           )}
         </div>
       </header>
@@ -393,12 +350,13 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 mt-10">
         {activeTab === 'calculator' ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            {/* Sol Parametreler */}
             <div className="lg:col-span-5 space-y-8">
               <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-8">
                 <div className="flex gap-2">
                   {[AnimalCategory.CATTLE, AnimalCategory.SHEEP, AnimalCategory.GOAT].map(cat => (
-                    <button key={cat} onClick={() => setProfile({...profile, category: cat})} className={`flex-1 py-4 rounded-2xl border-2 font-black text-[10px] uppercase transition-all ${profile.category === cat ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-slate-50 border-transparent text-slate-400'}`}>{cat}</button>
+                    <button key={cat} onClick={() => { const first = BREEDS.find(b => b.category === cat); setProfile({...profile, category: cat, breedId: first?.id || ''}) }} className={`flex-1 py-4 rounded-2xl border-2 font-black text-[10px] uppercase transition-all flex flex-col items-center gap-2 ${profile.category === cat ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-slate-50 border-transparent text-slate-400'}`}>
+                      {getCategoryIcon(cat)} {cat}
+                    </button>
                   ))}
                 </div>
                 <div className="space-y-4">
@@ -414,7 +372,7 @@ const App: React.FC = () => {
               </section>
 
               <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-6">
-                <div className="flex justify-between items-center"><h2 className="font-black text-sm uppercase tracking-widest text-slate-500">Rasyon Karışımı</h2><button onClick={() => setRation([...ration, {feedId: feeds[0].id, amountKg: 1}])} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Ekle</button></div>
+                <div className="flex justify-between items-center"><h2 className="font-black text-sm uppercase tracking-widest text-slate-500">Rasyon Bileşenleri</h2><button onClick={() => setRation([...ration, {feedId: feeds[0].id, amountKg: 1}])} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Ekle</button></div>
                 <div className="space-y-3">
                   {ration.map((item, idx) => (
                     <div key={idx} className="bg-slate-50 p-4 rounded-3xl flex gap-3 items-center">
@@ -429,7 +387,6 @@ const App: React.FC = () => {
               </section>
             </div>
 
-            {/* Sağ Analiz ve AI */}
             <div className="lg:col-span-7 space-y-8">
               <section className="bg-white rounded-[2.5rem] shadow-xl p-10">
                 <div className="h-[300px]">
@@ -459,41 +416,63 @@ const App: React.FC = () => {
                   <button 
                     onClick={getAdvice} 
                     disabled={isAiLoading || ration.length === 0} 
-                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase transition-all active:scale-95 disabled:opacity-50"
                   >
                     {isAiLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                    {isAiLoading ? 'Analiz Yapılıyor...' : 'Analiz Et ve Kaydet'}
+                    {isAiLoading ? 'Analiz Yapılıyor...' : 'Rasyonu Analiz Et'}
                   </button>
                 </div>
-                
                 {aiError && (
-                  <div className="mb-6 p-5 bg-red-500/10 border border-red-500/20 rounded-[2rem] flex items-start gap-4 animate-in fade-in duration-300">
+                  <div className="mb-6 p-5 bg-red-500/10 border border-red-500/20 rounded-[2rem] flex items-start gap-4">
                     <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-1" />
-                    <div>
-                      <p className="text-red-400 font-black text-xs uppercase mb-1 tracking-widest">Analiz Başarısız</p>
-                      <p className="text-white text-sm italic">{aiError}</p>
-                    </div>
+                    <p className="text-white text-sm italic">{aiError}</p>
                   </div>
                 )}
-
                 {aiAdvice ? (
-                  <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 text-slate-300 text-sm whitespace-pre-wrap leading-relaxed italic animate-in slide-in-from-bottom-4 duration-500 max-h-[350px] overflow-y-auto scrollbar-hide">
+                  <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 text-slate-300 text-sm whitespace-pre-wrap italic animate-in slide-in-from-bottom-4 duration-500 max-h-[350px] overflow-y-auto scrollbar-hide">
                     {aiAdvice}
                   </div>
                 ) : !isAiLoading && (
                   <div className="text-center py-10 flex flex-col items-center gap-4">
                     <MessageSquare className="w-12 h-12 text-slate-700" />
-                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] max-w-[220px]">Rasyonunuzu bilimsel olarak analiz etmek için yukarıdaki butona basın.</p>
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] max-w-[220px]">Bilimsel analiz için yukarıdaki butona basın.</p>
                   </div>
                 )}
               </section>
             </div>
           </div>
-        ) : activeTab === 'history' ? (
+        ) : activeTab === 'prices' ? (
+          <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-500">
+             <div className="flex flex-col md:flex-row items-baseline justify-between gap-6 border-b border-slate-200 pb-10">
+                <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4"><Tag className="w-10 h-10 text-emerald-600" /> Güncel Piyasa Fiyatları</h2>
+                <div className="flex flex-col items-end gap-2">
+                  {priceUpdatedDate && (
+                    <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider border border-emerald-100 shadow-sm">
+                      <Clock className="w-3.5 h-3.5" /> Son Güncelleme: {priceUpdatedDate}
+                    </div>
+                  )}
+                  <button onClick={updatePricesWithAI} disabled={isPriceUpdating} className="text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                    <RefreshCw className={`w-3.5 h-3.5 ${isPriceUpdating ? 'animate-spin' : ''}`} /> Fiyatları Yenile
+                  </button>
+                </div>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {feeds.map(f => (
+                  <div key={f.id} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all group">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{f.id}</span>
+                    <h4 className="font-black text-lg text-slate-800 mb-4">{f.name}</h4>
+                    <div className="text-2xl font-black text-emerald-600">{f.pricePerKg.toFixed(2)} <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">₺/kg</span></div>
+                  </div>
+                ))}
+             </div>
+          </div>
+        ) : (
           <div className="max-w-6xl mx-auto space-y-10 animate-in slide-in-from-right-4 duration-500">
             <div className="flex items-center justify-between">
-              <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4"><Archive className="w-10 h-10 text-emerald-600" /> Arşiv</h2>
-              <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-md active:scale-95"><Download className="w-4 h-4" /> Tümünü Yedekle</button>
+              <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4"><Archive className="w-10 h-10 text-emerald-600" /> Kayıtlı Rasyonlar</h2>
+              <div className="flex gap-2">
+                <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-md active:scale-95"><Download className="w-4 h-4" /> Yedekle</button>
+              </div>
             </div>
             {history.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -516,49 +495,38 @@ const App: React.FC = () => {
                         <div className="bg-slate-50 p-3 rounded-2xl text-center"><span className="block text-[8px] font-black text-slate-400 uppercase">Skor</span><span className="font-black text-blue-600">%{record.qualityScore}</span></div>
                       </div>
                       {record.aiAnalysisReport && (
-                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 italic line-clamp-3 overflow-hidden">
-                          {record.aiAnalysisReport}
+                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 italic line-clamp-2">
+                          <Sparkles className="w-3 h-3 inline mr-1" /> {record.aiAnalysisReport}
                         </div>
                       )}
                       <button 
                         onClick={() => { setProfile(record.profile); setRation(record.ration); setAiAdvice(record.aiAnalysisReport || null); setActiveTab('calculator'); }}
                         className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95"
-                      >Kaydı Planlayıcıda Aç</button>
+                      >Rasyonu Planlayıcıda Aç</button>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 text-slate-400 font-black uppercase tracking-widest">Henüz kayıtlı rasyon bulunmuyor.</div>
+              <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 text-slate-400 font-black uppercase tracking-widest">Arşiv boş görünüyor.</div>
             )}
-          </div>
-        ) : (
-          <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-500">
-             <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4"><Tag className="w-10 h-10 text-emerald-600" /> Güncel Fiyatlar</h2>
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {feeds.map(f => (
-                  <div key={f.id} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{f.id}</span>
-                    <h4 className="font-black text-lg text-slate-800 mb-4">{f.name}</h4>
-                    <div className="text-2xl font-black text-emerald-600">{f.pricePerKg.toFixed(2)} <span className="text-xs text-slate-400 font-bold uppercase">₺/kg</span></div>
-                  </div>
-                ))}
-             </div>
           </div>
         )}
       </main>
 
-      {/* Floating Toolbar */}
       {activeTab === 'calculator' && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-lg">
           <div className="bg-white/95 backdrop-blur-xl px-10 py-5 rounded-[2.5rem] shadow-2xl border border-emerald-100/50 flex items-center justify-between">
              <div className="flex flex-col">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">KG Başına Oran</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Toplam Karışım</span>
                 <span className="text-3xl font-black text-slate-900">{ration.reduce((a,b)=>a+b.amountKg, 0).toFixed(1)} <span className="text-xs text-slate-400">KG</span></span>
              </div>
-             <button onClick={() => handleSave()} disabled={isSaving || ration.length === 0} className="bg-slate-900 text-white px-10 py-5 rounded-[1.75rem] font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl active:scale-95 disabled:opacity-50">
-                {isSaving ? 'Kaydediliyor...' : 'Manuel Kaydet'}
-             </button>
+             <div className="flex gap-3">
+                <button onClick={() => setActiveTab('history')} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 active:scale-95 shadow-sm"><Archive className="w-6 h-6" /></button>
+                <button onClick={() => handleSave()} disabled={isSaving || ration.length === 0} className="bg-slate-900 text-white px-10 py-5 rounded-[1.75rem] font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl active:scale-95 disabled:opacity-50">
+                  {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
+             </div>
           </div>
         </div>
       )}
