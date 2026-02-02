@@ -4,7 +4,6 @@ import { AnimalProfile, Feed, RationItem } from '../types';
 
 /**
  * Mevcut rasyonu analiz eden ve tavsiyeler sunan fonksiyon.
- * Olumsuz durumlar ve %100 skora ulaşma tavsiyeleri eklenmiştir.
  */
 export const getRationAdvice = async (
   profile: AnimalProfile,
@@ -46,11 +45,11 @@ export const getRationAdvice = async (
       
       ANALİZ GÖREVİ:
       1. Rasyonun genel dengesini ve özellikle Magnezyum/Bikarbonat gibi tamponlayıcıları değerlendir.
-      2. RASYON SKORUNU %100'E NASIL ULAŞTIRABİLİRİZ? (Hangi yemleri ne oranda artırmalı/azaltmalı detaylı açıkla).
-      3. MEVCUT HATALI BESLEMENİN SONUÇLARI: Bu rasyon bu şekilde devam ederse hayvanda oluşabilecek olumsuz durumlar nelerdir? (Asidoz, metabolik hastalıklar vb.)
+      2. RASYON SKORUNU %100'E NASIL ULAŞTIRABİLİRİZ?
+      3. MEVCUT HATALI BESLEMENİN SONUÇLARI: Bu rasyon bu şekilde devam ederse hayvanda oluşabilecek olumsuz durumlar nelerdir?
       4. OLUMSUZ DURUMLARI GİDERME: Bu sorunları önlemek için acil tavsiyeler ver.
       
-      Cevabı profesyonel, yapıcı ve tamamen Türkçe olarak ver. Madde madde ve net konuş.
+      Cevabı profesyonel, yapıcı ve tamamen Türkçe olarak ver.
     `;
 
     const result = await ai.models.generateContent({
@@ -61,10 +60,7 @@ export const getRationAdvice = async (
     return result.text || "Yapay zeka yanıt oluşturamadı.";
   } catch (error: any) {
     console.error("Gemini Analiz Hatası:", error);
-    if (error?.message?.includes('429')) {
-      return "KOTA HATASI: API kullanım sınırı aşıldı. Lütfen 60 saniye bekleyip tekrar deneyiniz.";
-    }
-    return `HATA: Analiz sırasında bir sorun oluştu (${error?.message || 'Bağlantı sorunu'}).`;
+    return `HATA: Analiz sırasında bir sorun oluştu.`;
   }
 };
 
@@ -83,22 +79,15 @@ export const optimizeRationAmounts = async (
     
     const availableFeeds = currentRation.map(item => {
       const f = feedDb.find(feed => feed.id === item.feedId);
-      return `${f?.id}: ${f?.name} (KM: %${f?.dryMatter}, ME: ${f?.metabolizableEnergy}, HP: %${f?.crudeProtein}, Ca: %${f?.calcium}, P: %${f?.phosphorus}, Mg: %${f?.magnesium})`;
+      return `${f?.id}: ${f?.name} (KM: %${f?.dryMatter}, ME: ${f?.metabolizableEnergy}, HP: %${f?.crudeProtein})`;
     }).join('\n');
 
     const prompt = `
-      Sen rasyon dengeleme yazılımısın. Aşağıdaki hayvan için SADECE belirtilen yemleri kullanarak, besin ihtiyaçlarını (KM, Enerji, Protein, Ca, P, Mg, Na) en iyi karşılayacak MİKTARLARI (kg) belirle.
-      
-      HAYVAN: ${profile.category} - ${breedName} (${profile.weight} kg, Hedef GCAA: ${profile.dailyGain} kg)
-      İHTİYAÇLAR: KM: ${requirements.dryMatterIntake.toFixed(2)}kg, Enerji: ${requirements.energy.toFixed(2)}MJ, Protein: ${requirements.protein.toFixed(2)}g, Ca: ${requirements.calcium.toFixed(2)}g, P: ${requirements.phosphorus.toFixed(2)}g, Mg: ${requirements.magnesium.toFixed(2)}g
-      KULLANILACAK YEMLER:
-      ${availableFeeds}
-      
-      KURALLAR:
-      1. Sadece listedeki yemlerin miktarını değiştir.
-      2. Toplam Kuru Madde (KM) ihtiyacı geçilmemeli.
-      3. Enerji ve Protein %100'e en yakın olmalı.
-      4. Çıktıyı SADECE JSON formatında ver.
+      Sadece belirtilen yemleri kullanarak, besin ihtiyaçlarını en iyi karşılayacak MİKTARLARI (kg) belirle.
+      HAYVAN: ${profile.category} - ${breedName} (${profile.weight} kg)
+      İHTİYAÇLAR: KM: ${requirements.dryMatterIntake.toFixed(2)}kg, Enerji: ${requirements.energy.toFixed(2)}MJ, Protein: ${requirements.protein.toFixed(2)}g
+      KULLANILACAK YEMLER: ${availableFeeds}
+      Çıktı SADECE JSON: {"items": [{"feedId": "id", "amountKg": sayı}]}
     `;
 
     const response = await ai.models.generateContent({

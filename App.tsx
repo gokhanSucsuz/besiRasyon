@@ -489,14 +489,16 @@ const App: React.FC = () => {
                     </button>
                   ))}
                 </div>
-                <div className="space-y-4">
-                  <InfoLabel label="Genetik Irk" tooltip="Irka özgü baz enerji ve protein ihtiyaçları." />
-                  <select className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 px-5 font-bold outline-none focus:border-emerald-500" value={profile.breedId} onChange={e => setProfile({...profile, breedId: e.target.value})}>
-                    {BREEDS.filter(b => b.category === profile.category).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><InfoLabel label="Ağırlık (kg)" tooltip="Hayvan kilosu." /><input type="number" value={profile.weight} onChange={e => setProfile({...profile, weight: Number(e.target.value)})} className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 px-5 font-black text-xl outline-none focus:border-emerald-500"/></div>
-                    <div className="space-y-2"><InfoLabel label="Hedef Artış (kg/g)" tooltip="Günlük hedef kilo alımı." /><input type="number" step="0.1" value={profile.dailyGain} onChange={e => setProfile({...profile, dailyGain: Number(e.target.value)})} className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 px-5 font-black text-xl outline-none focus:border-emerald-500"/></div>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <InfoLabel label="Genetik Irk" tooltip="Irka özgü baz enerji ve protein ihtiyaçları." />
+                    <select className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 px-5 font-bold outline-none focus:border-emerald-500" value={profile.breedId} onChange={e => setProfile({...profile, breedId: e.target.value})}>
+                      {BREEDS.filter(b => b.category === profile.category).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2"><InfoLabel label="Ağırlık (kg)" tooltip="Hayvan kilosu." /><input type="number" value={profile.weight} onChange={e => setProfile({...profile, weight: Number(e.target.value)})} className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 px-5 font-black text-xl outline-none focus:border-emerald-500"/></div>
+                      <div className="space-y-2"><InfoLabel label="Hedef Artış (kg/g)" tooltip="Günlük hedef kilo alımı." /><input type="number" step="0.1" value={profile.dailyGain} onChange={e => setProfile({...profile, dailyGain: Number(e.target.value)})} className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 px-5 font-black text-xl outline-none focus:border-emerald-500"/></div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -512,10 +514,10 @@ const App: React.FC = () => {
                       onClick={handleOptimize} 
                       disabled={isOptimizing || ration.length === 0}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 transition-all disabled:opacity-50"
-                      title="Gemini bileşenlerin miktarını otomatik ayarlasın"
+                      title="Miktarları Otomatik Ayarla"
                     >
                       {isOptimizing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                      Akıllı Ayar
+                      Miktar Optimize Et
                     </button>
                     <button onClick={() => setRation([...ration, {feedId: feeds[0].id, amountKg: 1}])} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all">Ekle</button>
                   </div>
@@ -531,6 +533,22 @@ const App: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                
+                {ration.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center bg-emerald-50/50 p-6 rounded-[2rem] border border-emerald-100/50 animate-in slide-in-from-bottom-2 duration-500">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Rasyon Maliyet Özeti</span>
+                      <span className="text-[11px] text-slate-400 font-bold leading-tight max-w-[140px]">Günlük hayvan başına düşen toplam kaba ve kesif yem maliyetidir.</span>
+                    </div>
+                    <div className="text-right flex flex-col items-end">
+                      <div className="flex items-baseline gap-1.5 text-emerald-700">
+                        <span className="text-3xl font-black tracking-tighter">{totals.cost.toFixed(2)}</span>
+                        <span className="text-sm font-black uppercase tracking-widest opacity-80">₺</span>
+                      </div>
+                      <span className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest mt-0.5">Hayvan / Günlük</span>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
 
@@ -722,25 +740,25 @@ const App: React.FC = () => {
               <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-emerald-200 transition-all">
                 <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-2"><MousePointer2 className="w-6 h-6" /></div>
                 <h3 className="text-xl font-black">1. Hayvan Parametreleri</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">İlk adım olarak hayvanınızın kategorisini (Büyükbaş, Koyun, Keçi) ve ırkını seçin. Sisteme tanımlı 30'dan fazla genetik ırkın yaşama payı ihtiyaçları bilimsel normlara göre hesaplanır. Hedeflediğiniz canlı ağırlık artışını girerek besin madde normlarını belirleyin.</p>
+                <p className="text-slate-600 text-sm leading-relaxed">İlk adım olarak hayvanınızın kategorisini (Büyükbaş, Koyun, Keçi) ve ırkını seçin. Sisteme tanımlı 30'dan fazla genetik ırkın yaşama payı ihtiyaçları bilimsel normlara göre hesaplanır.</p>
               </section>
 
               <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-blue-200 transition-all">
                 <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-2"><Calculator className="w-6 h-6" /></div>
                 <h3 className="text-xl font-black">2. Rasyon Hazırlama</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">"Ekle" butonuna basarak rasyon bileşenlerini seçin ve günlük verilecek miktarları kg cinsinden girin. Grafikler üzerinden KM, Enerji, Protein, Ca, P, Mg ve Na değerlerinin normlara ne kadar yakın olduğunu anlık takip edebilirsiniz.</p>
+                <p className="text-slate-600 text-sm leading-relaxed">"Ekle" butonuna basarak rasyon bileşenlerini seçin ve günlük verilecek miktarları kg cinsinden girin.</p>
               </section>
 
               <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-purple-200 transition-all">
                 <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 mb-2"><Cpu className="w-6 h-6" /></div>
                 <h3 className="text-xl font-black">3. Akıllı Optimizasyon</h3>
-                <p className="text-slate-600 text-sm leading-relaxed"><b>"Akıllı Ayar"</b> butonu ile Gemini AI seçtiğiniz yemlerin miktarlarını besin ihtiyaçlarına göre en ideal noktaya otomatik taşır. <b>"Analiz Et"</b> butonu ise zooteknist bakış açısıyla rasyonunuzu değerlendirir, olası sağlık sorunlarını önceden bildirir.</p>
+                <p className="text-slate-600 text-sm leading-relaxed"><b>"Miktar Optimize Et"</b> butonu ile Gemini AI seçtiğiniz mevcut yemlerin miktarlarını besin ihtiyaçlarına göre en ideal noktaya otomatik taşır.</p>
               </section>
 
               <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-amber-200 transition-all">
                 <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-2"><Printer className="w-6 h-6" /></div>
                 <h3 className="text-xl font-black">4. Raporlama ve Yazdırma</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">Arşivlediğiniz rasyonları yazıcı ikonu ile PDF'e dönüştürebilirsiniz. Profesyonel çıktılarda besin dengesini gösteren grafikler, analiz raporları ve maliyet dökümleri otomatik olarak yer alır.</p>
+                <p className="text-slate-600 text-sm leading-relaxed">Arşivlediğiniz rasyonları yazıcı ikonu ile PDF'e dönüştürebilirsiniz. Profesyonel çıktılarda besin dengesini gösteren grafikler ve analizler yer alır.</p>
               </section>
             </div>
 
@@ -750,7 +768,6 @@ const App: React.FC = () => {
               <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
                 <p>• Verileriniz tarayıcınızın yerel hafızasında (IndexedDB) saklanır. Cihaz dışına çıkarılmaz.</p>
                 <p>• Cihaz değişikliği yapacaksanız "Arşiv" sekmesinden <b>"Yedekle"</b> butonunu kullanarak verilerinizi indirmeyi unutmayın.</p>
-                <p>• AI analizleri için Gemini 3.0 modeli kullanılır. Analiz hataları veya kota uyarıları durumunda belirtilen süre kadar beklemeniz önerilir.</p>
               </div>
             </div>
           </div>
