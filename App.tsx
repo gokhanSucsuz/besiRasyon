@@ -34,7 +34,11 @@ import {
   Activity,
   Wand2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  BookOpen,
+  MousePointer2,
+  Cpu,
+  ShieldCheck
 } from 'lucide-react';
 import { AnimalCategory, AnimalProfile, Feed, RationItem, NutrientRequirements } from './types';
 import { BREEDS, FEEDS as INITIAL_FEEDS } from './constants';
@@ -73,7 +77,7 @@ const getCategoryIcon = (category: AnimalCategory) => {
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'calculator' | 'prices' | 'history'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'prices' | 'history' | 'guide'>('calculator');
   const [feeds, setFeeds] = useState<Feed[]>(INITIAL_FEEDS);
   const [isPriceUpdating, setIsPriceUpdating] = useState(false);
   const [priceUpdatedDate, setPriceUpdatedDate] = useState<string | null>(null);
@@ -358,10 +362,10 @@ const App: React.FC = () => {
       { name: 'KM (kg)', Mevcut: record.totals.dm, Gereken: record.requirements.dryMatterIntake },
       { name: 'Enerji (MJ)', Mevcut: record.totals.energy, Gereken: record.requirements.energy },
       { name: 'Protein (g)', Mevcut: record.totals.protein, Gereken: record.requirements.protein },
-      { name: 'Ca (g)', Mevcut: record.totals.ca, Gereken: record.requirements.calcium },
-      { name: 'P (g)', Mevcut: record.totals.p, Gereken: record.requirements.phosphorus },
-      { name: 'Mg (g)', Mevcut: record.totals.mg, Gereken: record.requirements.magnesium },
-      { name: 'Na (g)', Mevcut: record.totals.na, Gereken: record.requirements.sodium },
+      { name: 'Kalsiyum (g)', Mevcut: record.totals.ca, Gereken: record.requirements.calcium },
+      { name: 'Fosfor (g)', Mevcut: record.totals.p, Gereken: record.requirements.phosphorus },
+      { name: 'Magnezyum (g)', Mevcut: record.totals.mg, Gereken: record.requirements.magnesium },
+      { name: 'Sodyum (g)', Mevcut: record.totals.na, Gereken: record.requirements.sodium },
     ];
 
     const chartHtml = currentChartData.map(d => {
@@ -408,7 +412,7 @@ const App: React.FC = () => {
             <div style="background:#f8fafc; padding:15px; border-radius:10px;"><b>Hedef GCAA:</b> ${record.profile.dailyGain} kg/g<br/><b>Maliyet:</b> ${record.totals.cost.toFixed(2)} TL</div>
           </div>
           
-          <div class="section-title">Besin Madde Analizi (Grafik)</div>
+          <div class="section-title">Besin Madde Analizi (Dengelenme Oranı)</div>
           <div class="chart-container">
             ${chartHtml}
           </div>
@@ -448,16 +452,21 @@ const App: React.FC = () => {
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tighter">BesiRasyon <span className="text-emerald-400">PRO</span></h1>
               <div className="flex gap-4 mt-1">
-                {['calculator', 'prices', 'history'].map(id => (
-                  <button key={id} onClick={() => setActiveTab(id as any)} className={`text-[10px] font-black uppercase tracking-widest ${activeTab === id ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-slate-400'}`}>
-                    {id === 'calculator' ? 'Planlayıcı' : id === 'prices' ? 'Fiyatlar' : 'Arşiv'}
+                {[
+                  {id: 'calculator', label: 'Planlayıcı'},
+                  {id: 'prices', label: 'Fiyatlar'},
+                  {id: 'history', label: 'Arşiv'},
+                  {id: 'guide', label: 'Kılavuz'}
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-slate-400 hover:text-white'}`}>
+                    {tab.label}
                   </button>
                 ))}
               </div>
             </div>
           </div>
           {activeTab === 'calculator' && (
-            <div className={`px-6 py-2 rounded-2xl border font-black hidden md:block transition-all ${getScoreColor(qualityScore)}`}>
+            <div className={`px-6 py-2 rounded-2xl border font-black hidden md:block transition-all shadow-sm ${getScoreColor(qualityScore)}`}>
               Rasyon Skoru: %{qualityScore}
             </div>
           )}
@@ -465,10 +474,10 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 mt-10">
-        {activeTab === 'calculator' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {activeTab === 'calculator' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in fade-in duration-500">
             <div className="lg:col-span-5 space-y-8">
-              <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-8">
+              <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-8 border border-slate-100">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><Settings className="w-5 h-5" /></div>
                   <h2 className="font-black text-sm uppercase tracking-widest text-slate-800">Hayvan Parametreleri</h2>
@@ -492,7 +501,7 @@ const App: React.FC = () => {
                 </div>
               </section>
 
-              <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-6">
+              <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-6 border border-slate-100">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><Calculator className="w-5 h-5" /></div>
@@ -526,7 +535,7 @@ const App: React.FC = () => {
             </div>
 
             <div className="lg:col-span-7 space-y-8">
-              <section className="bg-white rounded-[2.5rem] shadow-xl p-10">
+              <section className="bg-white rounded-[2.5rem] shadow-xl p-10 border border-slate-100">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><TrendingUp className="w-5 h-5" /></div>
                   <h2 className="font-black text-sm uppercase tracking-widest text-slate-800">Besin Madde Analizi</h2>
@@ -583,7 +592,9 @@ const App: React.FC = () => {
               </section>
             </div>
           </div>
-        ) : activeTab === 'prices' ? (
+        )}
+
+        {activeTab === 'prices' && (
           <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-500">
              <div className="flex flex-col md:flex-row items-baseline justify-between gap-6 border-b border-slate-200 pb-10">
                 <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4"><Tag className="w-10 h-10 text-emerald-600" /> Güncel Piyasa Fiyatları</h2>
@@ -608,7 +619,9 @@ const App: React.FC = () => {
                 ))}
              </div>
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'history' && (
           <div className="max-w-6xl mx-auto space-y-10 animate-in slide-in-from-right-4 duration-500">
             <div className="flex items-center justify-between">
               <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4"><Archive className="w-10 h-10 text-emerald-600" /> Kayıtlı Rasyonlar</h2>
@@ -630,10 +643,10 @@ const App: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {history.map(record => (
                   <div key={record.id} className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden group hover:border-emerald-500 transition-all flex flex-col">
-                    <div className="bg-slate-900 p-6 text-white flex justify-between">
+                    <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
                       <div>
                         <div className="text-[10px] text-emerald-400 font-black uppercase mb-1">{record.dateStr}</div>
-                        <h3 className="font-black text-lg">{BREEDS.find(b => b.id === record.profile.breedId)?.name}</h3>
+                        <h3 className="font-black text-lg leading-tight">{BREEDS.find(b => b.id === record.profile.breedId)?.name}</h3>
                       </div>
                       <div className="flex gap-2">
                          <button onClick={() => handlePrint(record)} className="p-2.5 bg-white/10 hover:bg-emerald-500 rounded-xl transition-all" title="Yazdır"><Printer className="w-4 h-4" /></button>
@@ -651,7 +664,7 @@ const App: React.FC = () => {
                         <div className="space-y-2">
                           <button 
                             onClick={() => setExpandedReportId(expandedReportId === record.id ? null : record.id!)}
-                            className="w-full p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 font-bold flex items-center justify-between hover:bg-emerald-100 transition-colors"
+                            className="w-full p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 font-black flex items-center justify-between hover:bg-emerald-100 transition-colors shadow-sm"
                           >
                             <span className="flex items-center gap-2">
                               <Sparkles className="w-3.5 h-3.5" /> 
@@ -661,11 +674,14 @@ const App: React.FC = () => {
                           </button>
                           
                           {expandedReportId === record.id && (
-                            <div className="max-h-[200px] overflow-y-auto space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 animate-in slide-in-from-top-2 duration-300">
+                            <div className="max-h-[300px] overflow-y-auto space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-200 animate-in slide-in-from-top-2 duration-300 scrollbar-hide shadow-inner">
                               {record.aiAnalysisReports.map((rep, idx) => (
-                                <div key={idx} className="text-[11px] text-slate-600 italic border-b border-slate-200 pb-2 last:border-0 last:pb-0">
-                                  <div className="font-black uppercase text-[8px] text-slate-400 mb-1">Rapor #{idx+1}</div>
-                                  {rep}
+                                <div key={idx} className="text-[11px] text-slate-600 italic border-b border-slate-200 pb-3 last:border-0 last:pb-0">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="font-black uppercase text-[8px] text-emerald-600">Analiz Raporu #{idx+1}</span>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                                  </div>
+                                  <div className="whitespace-pre-wrap leading-relaxed">{rep}</div>
                                 </div>
                               ))}
                             </div>
@@ -681,8 +697,8 @@ const App: React.FC = () => {
                           setCurrentRecordId(record.id || null);
                           setActiveTab('calculator'); 
                         }}
-                        className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95"
-                      >Düzenle / Analizleri Gör</button>
+                        className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95 shadow-md"
+                      >Rasyonu Planlayıcıda Aç</button>
                     </div>
                   </div>
                 ))}
@@ -690,6 +706,53 @@ const App: React.FC = () => {
             ) : (
               <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 text-slate-400 font-black uppercase tracking-widest">Arşiv boş görünüyor.</div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'guide' && (
+          <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-20">
+            <div className="text-center space-y-4 mb-16">
+              <h2 className="text-5xl font-black tracking-tighter flex items-center justify-center gap-4">
+                <BookOpen className="w-12 h-12 text-emerald-600" /> Kullanım Kılavuzu
+              </h2>
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">BesiRasyon PRO ile Verimli Hayvancılık</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-emerald-200 transition-all">
+                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-2"><MousePointer2 className="w-6 h-6" /></div>
+                <h3 className="text-xl font-black">1. Hayvan Parametreleri</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">İlk adım olarak hayvanınızın kategorisini (Büyükbaş, Koyun, Keçi) ve ırkını seçin. Sisteme tanımlı 30'dan fazla genetik ırkın yaşama payı ihtiyaçları bilimsel normlara göre hesaplanır. Hedeflediğiniz canlı ağırlık artışını girerek besin madde normlarını belirleyin.</p>
+              </section>
+
+              <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-blue-200 transition-all">
+                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-2"><Calculator className="w-6 h-6" /></div>
+                <h3 className="text-xl font-black">2. Rasyon Hazırlama</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">"Ekle" butonuna basarak rasyon bileşenlerini seçin ve günlük verilecek miktarları kg cinsinden girin. Grafikler üzerinden KM, Enerji, Protein, Ca, P, Mg ve Na değerlerinin normlara ne kadar yakın olduğunu anlık takip edebilirsiniz.</p>
+              </section>
+
+              <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-purple-200 transition-all">
+                <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 mb-2"><Cpu className="w-6 h-6" /></div>
+                <h3 className="text-xl font-black">3. Akıllı Optimizasyon</h3>
+                <p className="text-slate-600 text-sm leading-relaxed"><b>"Akıllı Ayar"</b> butonu ile Gemini AI seçtiğiniz yemlerin miktarlarını besin ihtiyaçlarına göre en ideal noktaya otomatik taşır. <b>"Analiz Et"</b> butonu ise zooteknist bakış açısıyla rasyonunuzu değerlendirir, olası sağlık sorunlarını önceden bildirir.</p>
+              </section>
+
+              <section className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-4 group hover:border-amber-200 transition-all">
+                <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-2"><Printer className="w-6 h-6" /></div>
+                <h3 className="text-xl font-black">4. Raporlama ve Yazdırma</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">Arşivlediğiniz rasyonları yazıcı ikonu ile PDF'e dönüştürebilirsiniz. Profesyonel çıktılarda besin dengesini gösteren grafikler, analiz raporları ve maliyet dökümleri otomatik olarak yer alır.</p>
+              </section>
+            </div>
+
+            <div className="bg-slate-900 rounded-[3rem] p-12 text-white relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 right-0 p-10 opacity-10"><ShieldCheck className="w-32 h-32" /></div>
+              <h3 className="text-2xl font-black mb-6">Önemli Güvenlik ve Veri Notu</h3>
+              <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
+                <p>• Verileriniz tarayıcınızın yerel hafızasında (IndexedDB) saklanır. Cihaz dışına çıkarılmaz.</p>
+                <p>• Cihaz değişikliği yapacaksanız "Arşiv" sekmesinden <b>"Yedekle"</b> butonunu kullanarak verilerinizi indirmeyi unutmayın.</p>
+                <p>• AI analizleri için Gemini 3.0 modeli kullanılır. Analiz hataları veya kota uyarıları durumunda belirtilen süre kadar beklemeniz önerilir.</p>
+              </div>
+            </div>
           </div>
         )}
       </main>
@@ -704,7 +767,7 @@ const App: React.FC = () => {
              <div className="flex gap-3">
                 <button onClick={() => { setActiveTab('history'); setCurrentRecordId(null); }} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 active:scale-95 shadow-sm" title="Arşive Git"><Archive className="w-6 h-6" /></button>
                 <button onClick={() => handleSave()} disabled={isSaving || ration.length === 0} className="bg-slate-900 text-white px-10 py-5 rounded-[1.75rem] font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl active:scale-95 disabled:opacity-50">
-                  {isSaving ? 'Bekleyin...' : 'Arşivle'}
+                  {isSaving ? 'Kaydediliyor' : 'Arşivle'}
                 </button>
              </div>
           </div>
