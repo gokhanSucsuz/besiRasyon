@@ -21,6 +21,9 @@ export interface Feed {
   crudeProtein: number; // % in DM
   calcium: number; // % in DM
   phosphorus: number; // % in DM
+  magnesium: number; // % in DM
+  sodium: number; // % in DM
+  bicarbonate: number; // % in DM
   pricePerKg: number; // TL/kg (Fresh)
 }
 
@@ -35,6 +38,8 @@ export interface NutrientRequirements {
   protein: number; // g/day
   calcium: number; // g/day
   phosphorus: number; // g/day
+  magnesium: number; // g/day
+  sodium: number; // g/day
 }
 
 export interface AnimalProfile {

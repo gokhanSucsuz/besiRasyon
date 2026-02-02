@@ -39,42 +39,44 @@ export const BREEDS: AnimalBreed[] = [
 
 export const FEEDS: Feed[] = [
   // Enerji Yemleri (Kesif)
-  { id: 'corn', name: 'Mısır (Tane)', dryMatter: 88, metabolizableEnergy: 13.5, crudeProtein: 9.0, calcium: 0.02, phosphorus: 0.30, pricePerKg: 9.2 },
-  { id: 'barley', name: 'Arpa (Tane)', dryMatter: 88, metabolizableEnergy: 12.5, crudeProtein: 11.5, calcium: 0.05, phosphorus: 0.35, pricePerKg: 8.5 },
-  { id: 'rolled_barley', name: 'Arpa Ezmesi', dryMatter: 88, metabolizableEnergy: 12.6, crudeProtein: 11.5, calcium: 0.05, phosphorus: 0.35, pricePerKg: 9.0 },
-  { id: 'wheat', name: 'Buğday (Tane)', dryMatter: 89, metabolizableEnergy: 13.2, crudeProtein: 12.5, calcium: 0.05, phosphorus: 0.40, pricePerKg: 9.8 },
-  { id: 'oats', name: 'Yulaf', dryMatter: 89, metabolizableEnergy: 11.5, crudeProtein: 11.0, calcium: 0.10, phosphorus: 0.35, pricePerKg: 8.8 },
-  { id: 'molasses', name: 'Melas (Şeker Pancarı)', dryMatter: 75, metabolizableEnergy: 12.0, crudeProtein: 6.0, calcium: 0.80, phosphorus: 0.05, pricePerKg: 6.5 },
-  { id: 'sorghum', name: 'Sorgum', dryMatter: 89, metabolizableEnergy: 12.8, crudeProtein: 10.0, calcium: 0.04, phosphorus: 0.32, pricePerKg: 8.2 },
+  { id: 'corn', name: 'Mısır (Tane)', dryMatter: 88, metabolizableEnergy: 13.5, crudeProtein: 9.0, calcium: 0.02, phosphorus: 0.30, magnesium: 0.12, sodium: 0.01, bicarbonate: 0, pricePerKg: 9.2 },
+  { id: 'barley', name: 'Arpa (Tane)', dryMatter: 88, metabolizableEnergy: 12.5, crudeProtein: 11.5, calcium: 0.05, phosphorus: 0.35, magnesium: 0.13, sodium: 0.02, bicarbonate: 0, pricePerKg: 8.5 },
+  { id: 'rolled_barley', name: 'Arpa Ezmesi', dryMatter: 88, metabolizableEnergy: 12.6, crudeProtein: 11.5, calcium: 0.05, phosphorus: 0.35, magnesium: 0.13, sodium: 0.02, bicarbonate: 0, pricePerKg: 9.0 },
+  { id: 'wheat', name: 'Buğday (Tane)', dryMatter: 89, metabolizableEnergy: 13.2, crudeProtein: 12.5, calcium: 0.05, phosphorus: 0.40, magnesium: 0.15, sodium: 0.02, bicarbonate: 0, pricePerKg: 9.8 },
+  { id: 'oats', name: 'Yulaf', dryMatter: 89, metabolizableEnergy: 11.5, crudeProtein: 11.0, calcium: 0.10, phosphorus: 0.35, magnesium: 0.14, sodium: 0.03, bicarbonate: 0, pricePerKg: 8.8 },
+  { id: 'molasses', name: 'Melas (Şeker Pancarı)', dryMatter: 75, metabolizableEnergy: 12.0, crudeProtein: 6.0, calcium: 0.80, phosphorus: 0.05, magnesium: 0.40, sodium: 0.30, bicarbonate: 0, pricePerKg: 6.5 },
+  { id: 'sorghum', name: 'Sorgum', dryMatter: 89, metabolizableEnergy: 12.8, crudeProtein: 10.0, calcium: 0.04, phosphorus: 0.32, magnesium: 0.14, sodium: 0.02, bicarbonate: 0, pricePerKg: 8.2 },
 
   // Karma / Konsantre Yemler
-  { id: 'beef_concentrate', name: 'Besi Konsantre Yemi (Standart)', dryMatter: 88, metabolizableEnergy: 11.8, crudeProtein: 14.0, calcium: 1.00, phosphorus: 0.50, pricePerKg: 10.8 },
-  { id: 'dairy_concentrate', name: 'Süt Konsantre Yemi', dryMatter: 88, metabolizableEnergy: 12.0, crudeProtein: 18.0, calcium: 1.20, phosphorus: 0.60, pricePerKg: 11.5 },
+  { id: 'beef_concentrate', name: 'Besi Konsantre Yemi (Standart)', dryMatter: 88, metabolizableEnergy: 11.8, crudeProtein: 14.0, calcium: 1.00, phosphorus: 0.50, magnesium: 0.25, sodium: 0.35, bicarbonate: 0.50, pricePerKg: 10.8 },
+  { id: 'dairy_concentrate', name: 'Süt Konsantre Yemi', dryMatter: 88, metabolizableEnergy: 12.0, crudeProtein: 18.0, calcium: 1.20, phosphorus: 0.60, magnesium: 0.30, sodium: 0.40, bicarbonate: 0.60, pricePerKg: 11.5 },
 
   // Protein Yemleri (Küspeler)
-  { id: 'soybean_meal', name: 'Soya Küspesi (%44)', dryMatter: 90, metabolizableEnergy: 13.0, crudeProtein: 44.0, calcium: 0.30, phosphorus: 0.65, pricePerKg: 19.5 },
-  { id: 'sunflower_meal', name: 'Ayçiçeği Küspesi (%36 HP)', dryMatter: 91, metabolizableEnergy: 10.5, crudeProtein: 36.0, calcium: 0.40, phosphorus: 0.90, pricePerKg: 11.5 },
-  { id: 'cottonseed_meal', name: 'Pamuk Tohumu Küspesi', dryMatter: 92, metabolizableEnergy: 10.2, crudeProtein: 32.0, calcium: 0.20, phosphorus: 1.10, pricePerKg: 12.0 },
-  { id: 'canola_meal', name: 'Kanola Küspesi', dryMatter: 91, metabolizableEnergy: 11.5, crudeProtein: 35.0, calcium: 0.65, phosphorus: 1.00, pricePerKg: 13.5 },
-  { id: 'corn_gluten_feed', name: 'Mısır Gluteni (CGF)', dryMatter: 90, metabolizableEnergy: 11.8, crudeProtein: 21.0, calcium: 0.15, phosphorus: 0.80, pricePerKg: 10.5 },
-  { id: 'distillers_grains', name: 'DDGS (Mısır)', dryMatter: 90, metabolizableEnergy: 12.5, crudeProtein: 27.0, calcium: 0.10, phosphorus: 0.75, pricePerKg: 12.8 },
+  { id: 'soybean_meal', name: 'Soya Küspesi (%44)', dryMatter: 90, metabolizableEnergy: 13.0, crudeProtein: 44.0, calcium: 0.30, phosphorus: 0.65, magnesium: 0.30, sodium: 0.04, bicarbonate: 0, pricePerKg: 19.5 },
+  { id: 'sunflower_meal', name: 'Ayçiçeği Küspesi (%36 HP)', dryMatter: 91, metabolizableEnergy: 10.5, crudeProtein: 36.0, calcium: 0.40, phosphorus: 0.90, magnesium: 0.55, sodium: 0.06, bicarbonate: 0, pricePerKg: 11.5 },
+  { id: 'cottonseed_meal', name: 'Pamuk Tohumu Küspesi', dryMatter: 92, metabolizableEnergy: 10.2, crudeProtein: 32.0, calcium: 0.20, phosphorus: 1.10, magnesium: 0.60, sodium: 0.05, bicarbonate: 0, pricePerKg: 12.0 },
+  { id: 'canola_meal', name: 'Kanola Küspesi', dryMatter: 91, metabolizableEnergy: 11.5, crudeProtein: 35.0, calcium: 0.65, phosphorus: 1.00, magnesium: 0.50, sodium: 0.08, bicarbonate: 0, pricePerKg: 13.5 },
+  { id: 'corn_gluten_feed', name: 'Mısır Gluteni (CGF)', dryMatter: 90, metabolizableEnergy: 11.8, crudeProtein: 21.0, calcium: 0.15, phosphorus: 0.80, magnesium: 0.35, sodium: 0.20, bicarbonate: 0, pricePerKg: 10.5 },
+  { id: 'distillers_grains', name: 'DDGS (Mısır)', dryMatter: 90, metabolizableEnergy: 12.5, crudeProtein: 27.0, calcium: 0.10, phosphorus: 0.75, magnesium: 0.30, sodium: 0.25, bicarbonate: 0, pricePerKg: 12.8 },
 
   // Yan Ürünler
-  { id: 'wheat_bran', name: 'Buğday Kepeği', dryMatter: 89, metabolizableEnergy: 10.5, crudeProtein: 16.0, calcium: 0.14, phosphorus: 1.20, pricePerKg: 7.2 },
-  { id: 'beet_pulp_dry', name: 'Pancar Posası (Kuru)', dryMatter: 90, metabolizableEnergy: 11.5, crudeProtein: 9.0, calcium: 0.70, phosphorus: 0.10, pricePerKg: 8.0 },
-  { id: 'beet_pulp_wet', name: 'Pancar Posası (Yaş)', dryMatter: 15, metabolizableEnergy: 11.0, crudeProtein: 8.5, calcium: 0.65, phosphorus: 0.08, pricePerKg: 1.8 },
+  { id: 'wheat_bran', name: 'Buğday Kepeği', dryMatter: 89, metabolizableEnergy: 10.5, crudeProtein: 16.0, calcium: 0.14, phosphorus: 1.20, magnesium: 0.50, sodium: 0.05, bicarbonate: 0, pricePerKg: 7.2 },
+  { id: 'beet_pulp_dry', name: 'Pancar Posası (Kuru)', dryMatter: 90, metabolizableEnergy: 11.5, crudeProtein: 9.0, calcium: 0.70, phosphorus: 0.10, magnesium: 0.30, sodium: 0.15, bicarbonate: 0, pricePerKg: 8.0 },
+  { id: 'beet_pulp_wet', name: 'Pancar Posası (Yaş)', dryMatter: 15, metabolizableEnergy: 11.0, crudeProtein: 8.5, calcium: 0.65, phosphorus: 0.08, magnesium: 0.05, sodium: 0.03, bicarbonate: 0, pricePerKg: 1.8 },
 
   // Kaba Yemler
-  { id: 'alfalfa_hay', name: 'Yonca Kuru Otu (Çiçeklenme Başı)', dryMatter: 90, metabolizableEnergy: 9.5, crudeProtein: 18.5, calcium: 1.45, phosphorus: 0.25, pricePerKg: 8.5 },
-  { id: 'corn_silage', name: 'Mısır Silajı (Kaliteli)', dryMatter: 33, metabolizableEnergy: 10.8, crudeProtein: 8.5, calcium: 0.25, phosphorus: 0.20, pricePerKg: 3.2 },
-  { id: 'wheat_straw', name: 'Buğday Samanı', dryMatter: 90, metabolizableEnergy: 6.0, crudeProtein: 3.5, calcium: 0.40, phosphorus: 0.10, pricePerKg: 2.5 },
-  { id: 'vetch_oat_hay', name: 'Fiğ-Yulaf Karışımı Kuru Otu', dryMatter: 88, metabolizableEnergy: 8.8, crudeProtein: 14.0, calcium: 1.10, phosphorus: 0.22, pricePerKg: 7.0 },
-  { id: 'meadow_hay', name: 'Çayır Kuru Otu', dryMatter: 89, metabolizableEnergy: 8.2, crudeProtein: 10.0, calcium: 0.60, phosphorus: 0.20, pricePerKg: 6.5 },
-  { id: 'cottonseed_hull', name: 'Pamuk Çiğidi Kabuğu', dryMatter: 91, metabolizableEnergy: 6.5, crudeProtein: 4.0, calcium: 0.15, phosphorus: 0.10, pricePerKg: 5.5 },
+  { id: 'alfalfa_hay', name: 'Yonca Kuru Otu (Çiçeklenme Başı)', dryMatter: 90, metabolizableEnergy: 9.5, crudeProtein: 18.5, calcium: 1.45, phosphorus: 0.25, magnesium: 0.30, sodium: 0.10, bicarbonate: 0, pricePerKg: 8.5 },
+  { id: 'corn_silage', name: 'Mısır Silajı (Kaliteli)', dryMatter: 33, metabolizableEnergy: 10.8, crudeProtein: 8.5, calcium: 0.25, phosphorus: 0.20, magnesium: 0.18, sodium: 0.02, bicarbonate: 0, pricePerKg: 3.2 },
+  { id: 'wheat_straw', name: 'Buğday Samanı', dryMatter: 90, metabolizableEnergy: 6.0, crudeProtein: 3.5, calcium: 0.40, phosphorus: 0.10, magnesium: 0.10, sodium: 0.05, bicarbonate: 0, pricePerKg: 2.5 },
+  { id: 'vetch_oat_hay', name: 'Fiğ-Yulaf Karışımı Kuru Otu', dryMatter: 88, metabolizableEnergy: 8.8, crudeProtein: 14.0, calcium: 1.10, phosphorus: 0.22, magnesium: 0.25, sodium: 0.08, bicarbonate: 0, pricePerKg: 7.0 },
+  { id: 'meadow_hay', name: 'Çayır Kuru Otu', dryMatter: 89, metabolizableEnergy: 8.2, crudeProtein: 10.0, calcium: 0.60, phosphorus: 0.20, magnesium: 0.20, sodium: 0.06, bicarbonate: 0, pricePerKg: 6.5 },
+  { id: 'cottonseed_hull', name: 'Pamuk Çiğidi Kabuğu', dryMatter: 91, metabolizableEnergy: 6.5, crudeProtein: 4.0, calcium: 0.15, phosphorus: 0.10, magnesium: 0.15, sodium: 0.02, bicarbonate: 0, pricePerKg: 5.5 },
 
   // Mineraller ve Katkılar
-  { id: 'dcp', name: 'DCP (Dikalsiyum Fosfat)', dryMatter: 97, metabolizableEnergy: 0, crudeProtein: 0, calcium: 23.0, phosphorus: 18.0, pricePerKg: 25.0 },
-  { id: 'limestone', name: 'Mermer Tozu (Kalsiyum Karbonat)', dryMatter: 99, metabolizableEnergy: 0, crudeProtein: 0, calcium: 38.0, phosphorus: 0, pricePerKg: 4.5 },
-  { id: 'salt', name: 'Yemlik Tuz', dryMatter: 99, metabolizableEnergy: 0, crudeProtein: 0, calcium: 0, phosphorus: 0, pricePerKg: 5.0 },
-  { id: 'premix', name: 'Vitamin-Mineral Premiksi', dryMatter: 95, metabolizableEnergy: 0, crudeProtein: 0, calcium: 10.0, phosphorus: 5.0, pricePerKg: 85.0 },
+  { id: 'dcp', name: 'DCP (Dikalsiyum Fosfat)', dryMatter: 97, metabolizableEnergy: 0, crudeProtein: 0, calcium: 23.0, phosphorus: 18.0, magnesium: 1.0, sodium: 0, bicarbonate: 0, pricePerKg: 25.0 },
+  { id: 'limestone', name: 'Mermer Tozu (Kalsiyum Karbonat)', dryMatter: 99, metabolizableEnergy: 0, crudeProtein: 0, calcium: 38.0, phosphorus: 0, magnesium: 0.5, sodium: 0, bicarbonate: 0, pricePerKg: 4.5 },
+  { id: 'salt', name: 'Yemlik Tuz', dryMatter: 99, metabolizableEnergy: 0, crudeProtein: 0, calcium: 0, phosphorus: 0, magnesium: 0, sodium: 39.0, bicarbonate: 0, pricePerKg: 5.0 },
+  { id: 'bicarb', name: 'Sodyum Bikarbonat (Buffer)', dryMatter: 99, metabolizableEnergy: 0, crudeProtein: 0, calcium: 0, phosphorus: 0, magnesium: 0, sodium: 27.0, bicarbonate: 70.0, pricePerKg: 18.0 },
+  { id: 'mag_ox', name: 'Magnezyum Oksit', dryMatter: 99, metabolizableEnergy: 0, crudeProtein: 0, calcium: 0, phosphorus: 0, magnesium: 54.0, sodium: 0, bicarbonate: 0, pricePerKg: 35.0 },
+  { id: 'premix', name: 'Vitamin-Mineral Premiksi', dryMatter: 95, metabolizableEnergy: 0, crudeProtein: 0, calcium: 10.0, phosphorus: 5.0, magnesium: 2.0, sodium: 5.0, bicarbonate: 0, pricePerKg: 85.0 },
 ];

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -31,13 +31,15 @@ import {
   AlertCircle,
   HelpCircle,
   LayoutDashboard,
-  // Fix: Added missing Activity icon import
-  Activity
+  Activity,
+  Wand2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { AnimalCategory, AnimalProfile, Feed, RationItem, NutrientRequirements } from './types';
 import { BREEDS, FEEDS as INITIAL_FEEDS } from './constants';
-import { getRationAdvice, fetchCurrentMarketPrices, getPerfectRationSuggestion } from './services/geminiService';
-import { saveRationRecord, getAllRecords, deleteRecord, SavedRecord, exportDatabase, importDatabase } from './services/dbService';
+import { getRationAdvice, fetchCurrentMarketPrices, optimizeRationAmounts } from './services/geminiService';
+import { saveRationRecord, getAllRecords, deleteRecord, updateRecord, SavedRecord, exportDatabase, importDatabase } from './services/dbService';
 
 const InfoLabel: React.FC<{ label: string; tooltip: string; className?: string }> = ({ label, tooltip, className }) => (
   <div className={`flex items-center gap-1.5 group/info cursor-help ${className}`}>
@@ -54,6 +56,22 @@ const InfoLabel: React.FC<{ label: string; tooltip: string; className?: string }
   </div>
 );
 
+const getScoreColor = (score: number) => {
+  if (score >= 90) return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+  if (score >= 75) return 'bg-blue-50 text-blue-600 border-blue-200';
+  if (score >= 50) return 'bg-amber-50 text-amber-600 border-amber-200';
+  return 'bg-red-50 text-red-600 border-red-200';
+};
+
+const getCategoryIcon = (category: AnimalCategory) => {
+  switch (category) {
+    case AnimalCategory.CATTLE: return <Beef className="w-5 h-5" />;
+    case AnimalCategory.SHEEP: return <Cloud className="w-5 h-5" />;
+    case AnimalCategory.GOAT: return <Mountain className="w-5 h-5" />;
+    default: return <Activity className="w-5 h-5" />;
+  }
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'calculator' | 'prices' | 'history'>('calculator');
   const [feeds, setFeeds] = useState<Feed[]>(INITIAL_FEEDS);
@@ -62,6 +80,9 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<SavedRecord[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isBackupLoading, setIsBackupLoading] = useState(false);
+  const [currentRecordId, setCurrentRecordId] = useState<number | null>(null);
+  const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<AnimalProfile>({
     category: AnimalCategory.CATTLE,
@@ -80,7 +101,6 @@ const App: React.FC = () => {
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [suggestion, setSuggestion] = useState<{explanation: string, items: RationItem[]} | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
 
   useEffect(() => {
@@ -129,17 +149,22 @@ const App: React.FC = () => {
     const gainProtein = profile.dailyGain * proteinPerGain;
     const dmi = profile.weight * dmiFactor;
 
+    const mgReq = dmi * 2.0; 
+    const naReq = dmi * 1.2; 
+
     return {
       dryMatterIntake: dmi,
       energy: maintenanceEnergy + gainEnergy,
       protein: maintenanceProtein + gainProtein,
       calcium: (profile.weight * 0.05) + (profile.dailyGain * 15),
       phosphorus: (profile.weight * 0.03) + (profile.dailyGain * 8),
+      magnesium: mgReq,
+      sodium: naReq
     };
   }, [profile]);
 
   const totals = useMemo(() => {
-    let dm = 0, energy = 0, protein = 0, ca = 0, p = 0, cost = 0;
+    let dm = 0, energy = 0, protein = 0, ca = 0, p = 0, mg = 0, na = 0, bicarb = 0, cost = 0;
     ration.forEach(item => {
       const feed = feeds.find(f => f.id === item.feedId);
       if (feed) {
@@ -149,10 +174,13 @@ const App: React.FC = () => {
         protein += itemDM * (feed.crudeProtein / 100) * 1000;
         ca += itemDM * (feed.calcium / 100) * 1000;
         p += itemDM * (feed.phosphorus / 100) * 1000;
+        mg += itemDM * (feed.magnesium / 100) * 1000;
+        na += itemDM * (feed.sodium / 100) * 1000;
+        bicarb += itemDM * (feed.bicarbonate / 100) * 1000;
         cost += item.amountKg * feed.pricePerKg;
       }
     });
-    return { dm, energy, protein, ca, p, cost };
+    return { dm, energy, protein, ca, p, mg, na, bicarb, cost };
   }, [ration, feeds]);
 
   const qualityScore = useMemo(() => {
@@ -167,7 +195,8 @@ const App: React.FC = () => {
     const proteinScore = calculatePartScore(totals.protein, requirements.protein);
     const caScore = totals.ca >= requirements.calcium ? 100 : (totals.ca / requirements.calcium) * 100;
     const pScore = totals.p >= requirements.phosphorus ? 100 : (totals.p / requirements.phosphorus) * 100;
-    return Math.round((dmScore + energyScore + proteinScore + caScore + pScore) / 5);
+    const mgScore = totals.mg >= requirements.magnesium ? 100 : (totals.mg / requirements.magnesium) * 100;
+    return Math.round((dmScore + energyScore + proteinScore + caScore + pScore + mgScore) / 6);
   }, [totals, requirements, ration]);
 
   const chartData = useMemo(() => [
@@ -176,6 +205,8 @@ const App: React.FC = () => {
     { name: 'Protein (g/10)', Mevcut: totals.protein / 10, Gereken: requirements.protein / 10 },
     { name: 'Kalsiyum (g)', Mevcut: totals.ca, Gereken: requirements.calcium },
     { name: 'Fosfor (g)', Mevcut: totals.p, Gereken: requirements.phosphorus },
+    { name: 'Magnezyum (g)', Mevcut: totals.mg, Gereken: requirements.magnesium },
+    { name: 'Sodyum (g)', Mevcut: totals.na, Gereken: requirements.sodium },
   ], [totals, requirements]);
 
   const handleExport = async () => {
@@ -195,12 +226,32 @@ const App: React.FC = () => {
     }
   };
 
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsBackupLoading(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const jsonString = e.target?.result as string;
+        await importDatabase(jsonString);
+        await loadHistory();
+        alert("Yedek başarıyla geri yüklendi.");
+      } catch (error) {
+        alert("Geçersiz yedek dosyası.");
+      } finally {
+        setIsBackupLoading(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleSave = async (customAdvice?: string) => {
     if (ration.length === 0) return false;
     setIsSaving(true);
     try {
       const now = new Date();
-      await saveRationRecord({
+      const newRecordId = await saveRationRecord({
         timestamp: now.getTime(),
         dateStr: now.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         priceUpdatedDate: priceUpdatedDate || undefined,
@@ -209,8 +260,9 @@ const App: React.FC = () => {
         totals,
         requirements,
         qualityScore,
-        aiAnalysisReport: customAdvice || aiAdvice || undefined
+        aiAnalysisReports: customAdvice ? [customAdvice] : []
       });
+      setCurrentRecordId(newRecordId);
       await loadHistory();
       if (!customAdvice) {
         alert("Rasyon başarıyla arşivlendi.");
@@ -224,11 +276,25 @@ const App: React.FC = () => {
     }
   };
 
-  // Fix: Implemented missing handleDeleteRecord function
+  const handleUpdateRecordWithAdvice = async (advice: string) => {
+    if (!currentRecordId) return;
+    const currentRecord = history.find(r => r.id === currentRecordId);
+    if (!currentRecord) return;
+    
+    const updatedRecord: SavedRecord = {
+      ...currentRecord,
+      aiAnalysisReports: [...(currentRecord.aiAnalysisReports || []), advice]
+    };
+    
+    await updateRecord(updatedRecord);
+    await loadHistory();
+  };
+
   const handleDeleteRecord = async (id: number) => {
     if (window.confirm("Bu rasyonu arşivden silmek istediğinize emin misiniz?")) {
       try {
         await deleteRecord(id);
+        if (currentRecordId === id) setCurrentRecordId(null);
         await loadHistory();
       } catch (e) {
         alert("Silme işlemi başarısız oldu.");
@@ -244,12 +310,17 @@ const App: React.FC = () => {
     try {
       const breed = BREEDS.find(b => b.id === profile.breedId);
       const advice = await getRationAdvice(profile, breed?.name || 'Bilinmeyen', ration, feeds, totals, requirements);
-      if (advice && advice.startsWith('HATA:')) {
+      
+      if (advice && (advice.startsWith('HATA:') || advice.startsWith('KOTA HATASI:'))) {
         setAiError(advice);
       } else if (advice) {
         setAiAdvice(advice);
-        await handleSave(advice);
-        alert("Analiz tamamlandı ve arşivlendi.");
+        if (currentRecordId) {
+          await handleUpdateRecordWithAdvice(advice);
+        } else {
+          await handleSave(advice);
+        }
+        alert("Analiz tamamlandı ve arşive işlendi.");
       }
     } catch (e) {
       setAiError("Teknik bir hata oluştu. Lütfen tekrar deneyiniz.");
@@ -258,10 +329,57 @@ const App: React.FC = () => {
     }
   };
 
+  const handleOptimize = async () => {
+    if (isOptimizing || ration.length === 0) return;
+    setIsOptimizing(true);
+    try {
+      const breed = BREEDS.find(b => b.id === profile.breedId);
+      const optimizedItems = await optimizeRationAmounts(profile, breed?.name || 'Bilinmeyen', ration, feeds, requirements);
+      if (optimizedItems) {
+        setRation(optimizedItems);
+        alert("Rasyon miktarları besin ihtiyaçlarını %100'e yaklaştıracak şekilde Gemini tarafından güncellendi.");
+      } else {
+        alert("Optimizasyon yapılamadı. Lütfen bileşenleri kontrol edin.");
+      }
+    } catch (e) {
+      alert("Bir hata oluştu.");
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   const handlePrint = (record: SavedRecord) => {
     const breed = BREEDS.find(b => b.id === record.profile.breedId)?.name || 'Bilinmeyen';
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+
+    // Dinamik HTML Grafik Hazırlığı
+    const currentChartData = [
+      { name: 'KM (kg)', Mevcut: record.totals.dm, Gereken: record.requirements.dryMatterIntake },
+      { name: 'Enerji (MJ)', Mevcut: record.totals.energy, Gereken: record.requirements.energy },
+      { name: 'Protein (g)', Mevcut: record.totals.protein, Gereken: record.requirements.protein },
+      { name: 'Ca (g)', Mevcut: record.totals.ca, Gereken: record.requirements.calcium },
+      { name: 'P (g)', Mevcut: record.totals.p, Gereken: record.requirements.phosphorus },
+      { name: 'Mg (g)', Mevcut: record.totals.mg, Gereken: record.requirements.magnesium },
+      { name: 'Na (g)', Mevcut: record.totals.na, Gereken: record.requirements.sodium },
+    ];
+
+    const chartHtml = currentChartData.map(d => {
+      const percentage = Math.min(100, (d.Mevcut / d.Gereken) * 100);
+      const barColor = percentage < 85 || percentage > 115 ? '#ef4444' : '#10b981';
+      return `
+        <div style="margin-bottom: 12px;">
+          <div style="display:flex; justify-content: space-between; font-size: 10px; font-weight: bold; margin-bottom: 4px;">
+            <span>${d.name}</span>
+            <span>%${Math.round(percentage)} (${d.Mevcut.toFixed(1)} / ${d.Gereken.toFixed(1)})</span>
+          </div>
+          <div style="height: 14px; background: #e2e8f0; border-radius: 7px; overflow: hidden; position: relative;">
+            <div style="width: ${percentage}%; height: 100%; background: ${barColor};"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
     const styles = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -271,7 +389,9 @@ const App: React.FC = () => {
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { text-align: left; font-size: 10px; text-transform: uppercase; padding: 10px; border-bottom: 2px solid #e2e8f0; }
         td { padding: 12px 10px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
-        .ai-report { background: #f0fdf4; padding: 20px; border-radius: 12px; font-size: 12px; white-space: pre-wrap; font-style: italic; }
+        .ai-report { background: #f0fdf4; padding: 20px; border-radius: 12px; font-size: 12px; white-space: pre-wrap; font-style: italic; margin-bottom: 15px; border: 1px solid #bbf7d0; }
+        .page-break { page-break-before: always; }
+        .chart-container { background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e2e8f0; }
       </style>
     `;
     const content = `
@@ -280,46 +400,41 @@ const App: React.FC = () => {
         <body>
           <div class="header">
             <div><h1 style="margin:0; font-size:24px;">BesiRasyon <span style="color:#10b981">PRO</span></h1></div>
-            <div style="text-align:right">Skor: %${record.qualityScore}<br/>${record.dateStr}</div>
+            <div style="text-align:right">Rasyon Skoru: %${record.qualityScore}<br/>${record.dateStr}</div>
           </div>
           <div class="section-title">Hayvan Bilgileri</div>
-          <div style="display:grid; grid-template-cols:1fr 1fr; gap:20px; margin-bottom:30px;">
-            <div style="background:#f8fafc; padding:15px; border-radius:10px;">${breed}<br/>${record.profile.weight} kg</div>
-            <div style="background:#f8fafc; padding:15px; border-radius:10px;">Hedef: ${record.profile.dailyGain} kg/g<br/>Maliyet: ${record.totals.cost.toFixed(2)} TL</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px;">
+            <div style="background:#f8fafc; padding:15px; border-radius:10px;"><b>Irk:</b> ${breed}<br/><b>Ağırlık:</b> ${record.profile.weight} kg</div>
+            <div style="background:#f8fafc; padding:15px; border-radius:10px;"><b>Hedef GCAA:</b> ${record.profile.dailyGain} kg/g<br/><b>Maliyet:</b> ${record.totals.cost.toFixed(2)} TL</div>
           </div>
+          
+          <div class="section-title">Besin Madde Analizi (Grafik)</div>
+          <div class="chart-container">
+            ${chartHtml}
+          </div>
+
           <div class="section-title">Rasyon İçeriği</div>
           <table>
-            <thead><tr><th>Yem</th><th style="text-align:right">Miktar (kg)</th></tr></thead>
+            <thead><tr><th>Yem Bileşeni</th><th style="text-align:right">Miktar (kg/gün)</th></tr></thead>
             <tbody>
               ${record.ration.map(item => `<tr><td>${INITIAL_FEEDS.find(f => f.id === item.feedId)?.name}</td><td style="text-align:right">${item.amountKg}</td></tr>`).join('')}
             </tbody>
           </table>
-          ${record.aiAnalysisReport ? `
-          <div class="section-title" style="margin-top:30px;">AI Uzman Analizi</div>
-          <div class="ai-report">${record.aiAnalysisReport}</div>` : ''}
+          
+          ${record.aiAnalysisReports && record.aiAnalysisReports.length > 0 ? `
+          <div class="page-break"></div>
+          <div class="section-title" style="margin-top:30px;">Yapay Zeka Uzman Analiz Raporları</div>
+          ${record.aiAnalysisReports.map((rep, i) => `
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 12px; color: #64748b;">Analiz Raporu #${i+1}</div>
+            <div class="ai-report">${rep}</div>
+          `).join('')}
+          ` : ''}
           <script>window.print(); setTimeout(() => window.close(), 500);</script>
         </body>
       </html>
     `;
     printWindow.document.write(content);
     printWindow.document.close();
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-emerald-500 bg-emerald-50 border-emerald-200';
-    if (score >= 75) return 'text-blue-500 bg-blue-50 border-blue-200';
-    if (score >= 50) return 'text-amber-500 bg-amber-50 border-amber-200';
-    return 'text-red-500 bg-red-50 border-red-200';
-  };
-
-  const getCategoryIcon = (category: AnimalCategory) => {
-    switch (category) {
-      case AnimalCategory.CATTLE: return <Beef className="w-6 h-6" />;
-      case AnimalCategory.SHEEP: return <Cloud className="w-6 h-6" />;
-      case AnimalCategory.GOAT: return <Mountain className="w-6 h-6" />;
-      // Fix: Used the now-imported Activity icon
-      default: return <Activity className="w-6 h-6" />;
-    }
   };
 
   return (
@@ -342,7 +457,9 @@ const App: React.FC = () => {
             </div>
           </div>
           {activeTab === 'calculator' && (
-            <div className={`px-6 py-2 rounded-2xl border font-black hidden md:block ${getScoreColor(qualityScore)}`}>Rasyon Skoru: %{qualityScore}</div>
+            <div className={`px-6 py-2 rounded-2xl border font-black hidden md:block transition-all ${getScoreColor(qualityScore)}`}>
+              Rasyon Skoru: %{qualityScore}
+            </div>
           )}
         </div>
       </header>
@@ -352,6 +469,10 @@ const App: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             <div className="lg:col-span-5 space-y-8">
               <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><Settings className="w-5 h-5" /></div>
+                  <h2 className="font-black text-sm uppercase tracking-widest text-slate-800">Hayvan Parametreleri</h2>
+                </div>
                 <div className="flex gap-2">
                   {[AnimalCategory.CATTLE, AnimalCategory.SHEEP, AnimalCategory.GOAT].map(cat => (
                     <button key={cat} onClick={() => { const first = BREEDS.find(b => b.category === cat); setProfile({...profile, category: cat, breedId: first?.id || ''}) }} className={`flex-1 py-4 rounded-2xl border-2 font-black text-[10px] uppercase transition-all flex flex-col items-center gap-2 ${profile.category === cat ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-slate-50 border-transparent text-slate-400'}`}>
@@ -372,7 +493,24 @@ const App: React.FC = () => {
               </section>
 
               <section className="bg-white rounded-[2.5rem] shadow-xl p-10 space-y-6">
-                <div className="flex justify-between items-center"><h2 className="font-black text-sm uppercase tracking-widest text-slate-500">Rasyon Bileşenleri</h2><button onClick={() => setRation([...ration, {feedId: feeds[0].id, amountKg: 1}])} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Ekle</button></div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><Calculator className="w-5 h-5" /></div>
+                    <h2 className="font-black text-sm uppercase tracking-widest text-slate-800">Rasyon Bileşenleri</h2>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={handleOptimize} 
+                      disabled={isOptimizing || ration.length === 0}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 transition-all disabled:opacity-50"
+                      title="Gemini bileşenlerin miktarını otomatik ayarlasın"
+                    >
+                      {isOptimizing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                      Akıllı Ayar
+                    </button>
+                    <button onClick={() => setRation([...ration, {feedId: feeds[0].id, amountKg: 1}])} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all">Ekle</button>
+                  </div>
+                </div>
                 <div className="space-y-3">
                   {ration.map((item, idx) => (
                     <div key={idx} className="bg-slate-50 p-4 rounded-3xl flex gap-3 items-center">
@@ -389,24 +527,28 @@ const App: React.FC = () => {
 
             <div className="lg:col-span-7 space-y-8">
               <section className="bg-white rounded-[2.5rem] shadow-xl p-10">
-                <div className="h-[300px]">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><TrendingUp className="w-5 h-5" /></div>
+                  <h2 className="font-black text-sm uppercase tracking-widest text-slate-800">Besin Madde Analizi</h2>
+                </div>
+                <div className="h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700}} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 700}} interval={0} angle={-15} textAnchor="end" />
                       <YAxis hide />
                       <Tooltip />
-                      <Legend />
+                      <Legend verticalAlign="top" height={36}/>
                       <Bar dataKey="Mevcut" fill="#10b981" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="Gereken" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="grid grid-cols-4 gap-4 mt-8">
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Maliyet</span><span className="text-lg font-black text-emerald-600">{totals.cost.toFixed(1)} ₺</span></div>
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Enerji</span><span className="text-lg font-black text-slate-800">{totals.energy.toFixed(0)} MJ</span></div>
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Protein</span><span className="text-lg font-black text-slate-800">{totals.protein.toFixed(0)} g</span></div>
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">KM Toplam</span><span className="text-lg font-black text-slate-800">{totals.dm.toFixed(1)} kg</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">KM (kg)</span><span className="text-lg font-black text-slate-800">{totals.dm.toFixed(1)} / {requirements.dryMatterIntake.toFixed(1)}</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Magnezyum</span><span className="text-lg font-black text-slate-800">{totals.mg.toFixed(1)} g</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Bikarbonat</span><span className="text-lg font-black text-slate-800">{totals.bicarb.toFixed(1)} g</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Sodyum</span><span className="text-lg font-black text-slate-800">{totals.na.toFixed(1)} g</span></div>
                 </div>
               </section>
 
@@ -419,11 +561,11 @@ const App: React.FC = () => {
                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase transition-all active:scale-95 disabled:opacity-50"
                   >
                     {isAiLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                    {isAiLoading ? 'Analiz Yapılıyor...' : 'Rasyonu Analiz Et'}
+                    {isAiLoading ? 'Analiz Yapılıyor...' : 'Rasyonu Analiz Et ve Arşivle'}
                   </button>
                 </div>
                 {aiError && (
-                  <div className="mb-6 p-5 bg-red-500/10 border border-red-500/20 rounded-[2rem] flex items-start gap-4">
+                  <div className="mb-6 p-5 bg-red-500/10 border border-red-500/20 rounded-[2rem] flex items-start gap-4 animate-in fade-in duration-300">
                     <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-1" />
                     <p className="text-white text-sm italic">{aiError}</p>
                   </div>
@@ -435,7 +577,7 @@ const App: React.FC = () => {
                 ) : !isAiLoading && (
                   <div className="text-center py-10 flex flex-col items-center gap-4">
                     <MessageSquare className="w-12 h-12 text-slate-700" />
-                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] max-w-[220px]">Bilimsel analiz için yukarıdaki butona basın.</p>
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] max-w-[220px]">Uzman zooteknist analizi için yukarıdaki butona basın.</p>
                   </div>
                 )}
               </section>
@@ -471,38 +613,76 @@ const App: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4"><Archive className="w-10 h-10 text-emerald-600" /> Kayıtlı Rasyonlar</h2>
               <div className="flex gap-2">
-                <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-md active:scale-95"><Download className="w-4 h-4" /> Yedekle</button>
+                <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".json" />
+                <button 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={isBackupLoading}
+                  className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase shadow-sm active:scale-95 hover:bg-slate-50 transition-all"
+                >
+                  <Upload className="w-4 h-4" /> Geri Yükle
+                </button>
+                <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-md active:scale-95 hover:bg-slate-800 transition-all">
+                  <Download className="w-4 h-4" /> Yedekle
+                </button>
               </div>
             </div>
             {history.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {history.map(record => (
-                  <div key={record.id} className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden group hover:border-emerald-500 transition-all">
+                  <div key={record.id} className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden group hover:border-emerald-500 transition-all flex flex-col">
                     <div className="bg-slate-900 p-6 text-white flex justify-between">
                       <div>
                         <div className="text-[10px] text-emerald-400 font-black uppercase mb-1">{record.dateStr}</div>
                         <h3 className="font-black text-lg">{BREEDS.find(b => b.id === record.profile.breedId)?.name}</h3>
                       </div>
                       <div className="flex gap-2">
-                         <button onClick={() => handlePrint(record)} className="p-2.5 bg-white/10 hover:bg-emerald-500 rounded-xl transition-all"><Printer className="w-4 h-4" /></button>
-                         <button onClick={() => record.id && handleDeleteRecord(record.id)} className="p-2.5 bg-white/10 hover:bg-red-500 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                         <button onClick={() => handlePrint(record)} className="p-2.5 bg-white/10 hover:bg-emerald-500 rounded-xl transition-all" title="Yazdır"><Printer className="w-4 h-4" /></button>
+                         <button onClick={() => record.id !== undefined && handleDeleteRecord(record.id)} className="p-2.5 bg-white/10 hover:bg-red-500 rounded-xl transition-all" title="Sil"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </div>
-                    <div className="p-8 space-y-4">
+                    <div className="p-8 space-y-4 flex-1">
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-slate-50 p-3 rounded-2xl text-center"><span className="block text-[8px] font-black text-slate-400 uppercase">Ağırlık</span><span className="font-black text-slate-800">{record.profile.weight} kg</span></div>
                         <div className="bg-slate-50 p-3 rounded-2xl text-center"><span className="block text-[8px] font-black text-slate-400 uppercase">Maliyet</span><span className="font-black text-emerald-600">{record.totals.cost.toFixed(1)} ₺</span></div>
                         <div className="bg-slate-50 p-3 rounded-2xl text-center"><span className="block text-[8px] font-black text-slate-400 uppercase">Skor</span><span className="font-black text-blue-600">%{record.qualityScore}</span></div>
                       </div>
-                      {record.aiAnalysisReport && (
-                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 italic line-clamp-2">
-                          <Sparkles className="w-3 h-3 inline mr-1" /> {record.aiAnalysisReport}
+                      
+                      {record.aiAnalysisReports && record.aiAnalysisReports.length > 0 && (
+                        <div className="space-y-2">
+                          <button 
+                            onClick={() => setExpandedReportId(expandedReportId === record.id ? null : record.id!)}
+                            className="w-full p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 font-bold flex items-center justify-between hover:bg-emerald-100 transition-colors"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="w-3.5 h-3.5" /> 
+                              {record.aiAnalysisReports.length} analiz raporu mevcut
+                            </span>
+                            {expandedReportId === record.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                          
+                          {expandedReportId === record.id && (
+                            <div className="max-h-[200px] overflow-y-auto space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 animate-in slide-in-from-top-2 duration-300">
+                              {record.aiAnalysisReports.map((rep, idx) => (
+                                <div key={idx} className="text-[11px] text-slate-600 italic border-b border-slate-200 pb-2 last:border-0 last:pb-0">
+                                  <div className="font-black uppercase text-[8px] text-slate-400 mb-1">Rapor #{idx+1}</div>
+                                  {rep}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
+
                       <button 
-                        onClick={() => { setProfile(record.profile); setRation(record.ration); setAiAdvice(record.aiAnalysisReport || null); setActiveTab('calculator'); }}
+                        onClick={() => { 
+                          setProfile(record.profile); 
+                          setRation(record.ration); 
+                          setAiAdvice(record.aiAnalysisReports && record.aiAnalysisReports.length > 0 ? record.aiAnalysisReports[record.aiAnalysisReports.length-1] : null); 
+                          setCurrentRecordId(record.id || null);
+                          setActiveTab('calculator'); 
+                        }}
                         className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95"
-                      >Rasyonu Planlayıcıda Aç</button>
+                      >Düzenle / Analizleri Gör</button>
                     </div>
                   </div>
                 ))}
@@ -522,9 +702,9 @@ const App: React.FC = () => {
                 <span className="text-3xl font-black text-slate-900">{ration.reduce((a,b)=>a+b.amountKg, 0).toFixed(1)} <span className="text-xs text-slate-400">KG</span></span>
              </div>
              <div className="flex gap-3">
-                <button onClick={() => setActiveTab('history')} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 active:scale-95 shadow-sm"><Archive className="w-6 h-6" /></button>
+                <button onClick={() => { setActiveTab('history'); setCurrentRecordId(null); }} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 active:scale-95 shadow-sm" title="Arşive Git"><Archive className="w-6 h-6" /></button>
                 <button onClick={() => handleSave()} disabled={isSaving || ration.length === 0} className="bg-slate-900 text-white px-10 py-5 rounded-[1.75rem] font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl active:scale-95 disabled:opacity-50">
-                  {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                  {isSaving ? 'Bekleyin...' : 'Arşivle'}
                 </button>
              </div>
           </div>

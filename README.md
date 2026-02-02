@@ -64,5 +64,5 @@ Cihaz değişikliği yaparken veya verilerinizi korumak için Arşiv sekmesindek
 ## ⚠️ Önemli Not
 Bu uygulama tarafından sağlanan rasyon formülleri bilimsel normlara dayanmaktadır ancak profesyonel bir zooteknistin yerinde incelemesinin yerini tutmaz. Uygulama, hayvancılık işletmeleri için bir karar destek mekanizmasıdır.
 
-**Geliştirici:** Gökhan SUÇSUZ
-**Sürüm:** 1.0.0 (PRO)
+**Geliştirici:** BesiRasyon Yazılım Hizmetleri  
+**Sürüm:** 2.0.0 (PRO)

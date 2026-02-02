@@ -3,18 +3,19 @@ import { AnimalProfile, RationItem } from '../types';
 
 const DB_NAME = 'BesiRasyonDB';
 const STORE_NAME = 'saved_rations';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Sürüm yükseltildi
 
 export interface SavedRecord {
   id?: number;
   timestamp: number;
   dateStr: string;
-  priceUpdatedDate?: string; // Fiyatların alındığı tarih bilgisi
+  priceUpdatedDate?: string;
   profile: AnimalProfile;
   ration: RationItem[];
   totals: any;
   requirements: any;
   qualityScore: number;
+  aiAnalysisReports?: string[]; // Birden fazla rapor desteği
 }
 
 export const initDB = (): Promise<IDBDatabase> => {
@@ -33,12 +34,24 @@ export const initDB = (): Promise<IDBDatabase> => {
   });
 };
 
-export const saveRationRecord = async (record: Omit<SavedRecord, 'id'>) => {
+export const saveRationRecord = async (record: Omit<SavedRecord, 'id'>): Promise<number> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.add(record);
+
+    request.onsuccess = () => resolve(request.result as number);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const updateRecord = async (record: SavedRecord) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(record);
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -72,13 +85,11 @@ export const deleteRecord = async (id: number) => {
   });
 };
 
-// Yedekleme için tüm verileri dışa aktar
 export const exportDatabase = async (): Promise<string> => {
   const records = await getAllRecords();
   return JSON.stringify(records, null, 2);
 };
 
-// Yedek dosyasından verileri içeri aktar
 export const importDatabase = async (jsonString: string): Promise<void> => {
   const db = await initDB();
   const records: SavedRecord[] = JSON.parse(jsonString);
@@ -86,15 +97,11 @@ export const importDatabase = async (jsonString: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    
-    // Mevcutları temizle (isteğe bağlı, üzerine yazma güvenliği için)
     store.clear();
-    
     records.forEach(record => {
-      const { id, ...dataWithoutId } = record; // Yeni ID'ler oluşması için
+      const { id, ...dataWithoutId } = record;
       store.add(dataWithoutId);
     });
-
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });

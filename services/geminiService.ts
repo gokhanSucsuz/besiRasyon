@@ -4,6 +4,7 @@ import { AnimalProfile, Feed, RationItem } from '../types';
 
 /**
  * Mevcut rasyonu analiz eden ve tavsiyeler sunan fonksiyon.
+ * Olumsuz durumlar ve %100 skora ulaşma tavsiyeleri eklenmiştir.
  */
 export const getRationAdvice = async (
   profile: AnimalProfile,
@@ -14,8 +15,7 @@ export const getRationAdvice = async (
   requirements: any
 ) => {
   try {
-    // Fix: Using named parameter for apiKey initialization as per guidelines
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     
     const rationDetails = ration.map(item => {
       const feed = feedDb.find(f => f.id === item.feedId);
@@ -40,57 +40,65 @@ export const getRationAdvice = async (
       - Ham Protein: ${totalNutrients.protein.toFixed(2)} / ${requirements.protein.toFixed(2)} g
       - Kalsiyum (Ca): ${totalNutrients.ca.toFixed(2)} / ${requirements.calcium.toFixed(2)} g
       - Fosfor (P): ${totalNutrients.p.toFixed(2)} / ${requirements.phosphorus.toFixed(2)} g
+      - Magnezyum (Mg): ${totalNutrients.mg.toFixed(2)} / ${requirements.magnesium.toFixed(2)} g
+      - Sodyum (Na): ${totalNutrients.na.toFixed(2)} / ${requirements.sodium.toFixed(2)} g
+      - Bikarbonat: ${totalNutrients.bicarb.toFixed(2)} g (Tamponlayıcı kapasite)
       
       ANALİZ GÖREVİ:
-      1. Rasyonun enerji ve protein dengesini değerlendir.
-      2. Kaba yem ve kesif yem oranının uygunluğunu belirt.
-      3. Hayvanın hedef kilosuna ulaşması için rasyonda yapılması gereken acil değişiklikleri söyle.
-      4. Vitamin ve mineral dengesini yorumla.
+      1. Rasyonun genel dengesini ve özellikle Magnezyum/Bikarbonat gibi tamponlayıcıları değerlendir.
+      2. RASYON SKORUNU %100'E NASIL ULAŞTIRABİLİRİZ? (Hangi yemleri ne oranda artırmalı/azaltmalı detaylı açıkla).
+      3. MEVCUT HATALI BESLEMENİN SONUÇLARI: Bu rasyon bu şekilde devam ederse hayvanda oluşabilecek olumsuz durumlar nelerdir? (Asidoz, metabolik hastalıklar vb.)
+      4. OLUMSUZ DURUMLARI GİDERME: Bu sorunları önlemek için acil tavsiyeler ver.
       
       Cevabı profesyonel, yapıcı ve tamamen Türkçe olarak ver. Madde madde ve net konuş.
     `;
 
-    // Fix: model name matches guidelines
     const result = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
     
-    if (!result.text) {
-      throw new Error("Boş yanıt döndü.");
-    }
-    
-    return result.text;
+    return result.text || "Yapay zeka yanıt oluşturamadı.";
   } catch (error: any) {
     console.error("Gemini Analiz Hatası:", error);
     if (error?.message?.includes('429')) {
-      return "HATA: API Kota sınırı aşıldı. Lütfen yaklaşık 1 dakika bekleyip tekrar deneyiniz.";
+      return "KOTA HATASI: API kullanım sınırı aşıldı. Lütfen 60 saniye bekleyip tekrar deneyiniz.";
     }
-    if (error?.message?.includes('500') || error?.message?.includes('503')) {
-      return "HATA: Sunucu yoğunluğu. Lütfen biraz sonra tekrar deneyiniz.";
-    }
-    return `HATA: Analiz sırasında bir sorun oluştu (${error?.message || 'Bilinmeyen hata'}).`;
+    return `HATA: Analiz sırasında bir sorun oluştu (${error?.message || 'Bağlantı sorunu'}).`;
   }
 };
 
 /**
- * Eldeki yemleri kullanarak en uygun rasyonu öneren fonksiyon.
+ * Mevcut yem bileşenlerinin miktarlarını besin ihtiyaçlarına göre en iyi hale getiren fonksiyon.
  */
-export const getPerfectRationSuggestion = async (
+export const optimizeRationAmounts = async (
   profile: AnimalProfile,
   breedName: string,
-  availableFeeds: Feed[]
+  currentRation: RationItem[],
+  feedDb: Feed[],
+  requirements: any
 ) => {
   try {
-    // Fix: Using named parameter for apiKey initialization
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const feedList = availableFeeds.map(f => `${f.id}: ${f.name} (KM: %${f.dryMatter}, ME: ${f.metabolizableEnergy}, HP: %${f.crudeProtein})`).join('\n');
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    
+    const availableFeeds = currentRation.map(item => {
+      const f = feedDb.find(feed => feed.id === item.feedId);
+      return `${f?.id}: ${f?.name} (KM: %${f?.dryMatter}, ME: ${f?.metabolizableEnergy}, HP: %${f?.crudeProtein}, Ca: %${f?.calcium}, P: %${f?.phosphorus}, Mg: %${f?.magnesium})`;
+    }).join('\n');
 
     const prompt = `
+      Sen rasyon dengeleme yazılımısın. Aşağıdaki hayvan için SADECE belirtilen yemleri kullanarak, besin ihtiyaçlarını (KM, Enerji, Protein, Ca, P, Mg, Na) en iyi karşılayacak MİKTARLARI (kg) belirle.
+      
       HAYVAN: ${profile.category} - ${breedName} (${profile.weight} kg, Hedef GCAA: ${profile.dailyGain} kg)
-      ELDEKİ YEMLER:
-      ${feedList}
-      Bu hayvan için eldeki yemlerle en ekonomik ve besinsel olarak dengeli bir rasyon oluştur ve JSON olarak dön.
+      İHTİYAÇLAR: KM: ${requirements.dryMatterIntake.toFixed(2)}kg, Enerji: ${requirements.energy.toFixed(2)}MJ, Protein: ${requirements.protein.toFixed(2)}g, Ca: ${requirements.calcium.toFixed(2)}g, P: ${requirements.phosphorus.toFixed(2)}g, Mg: ${requirements.magnesium.toFixed(2)}g
+      KULLANILACAK YEMLER:
+      ${availableFeeds}
+      
+      KURALLAR:
+      1. Sadece listedeki yemlerin miktarını değiştir.
+      2. Toplam Kuru Madde (KM) ihtiyacı geçilmemeli.
+      3. Enerji ve Protein %100'e en yakın olmalı.
+      4. Çıktıyı SADECE JSON formatında ver.
     `;
 
     const response = await ai.models.generateContent({
@@ -101,7 +109,6 @@ export const getPerfectRationSuggestion = async (
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            explanation: { type: Type.STRING },
             items: {
               type: Type.ARRAY,
               items: {
@@ -116,22 +123,18 @@ export const getPerfectRationSuggestion = async (
         }
       }
     });
-    // Fix: access .text property directly as per guidelines
+
     const text = response.text;
-    return text ? JSON.parse(text) : null;
+    return text ? JSON.parse(text).items : null;
   } catch (error) {
     console.error("Optimizasyon Hatası:", error);
     return null;
   }
 };
 
-/**
- * Piyasa fiyatlarını güncelleyen fonksiyon.
- */
 export const fetchCurrentMarketPrices = async (feeds: Feed[]) => {
   try {
-    // Fix: Using named parameter for apiKey initialization
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const feedNames = feeds.map(f => f.name).join(", ");
     const prompt = `Türkiye yem piyasası güncel kg fiyatlarını JSON formatında ver: {"yem_id": fiyat_number}. Yemler: ${feedNames}`;
 
@@ -143,7 +146,6 @@ export const fetchCurrentMarketPrices = async (feeds: Feed[]) => {
         responseMimeType: "application/json"
       }
     });
-    // Fix: access .text property directly
     const text = response.text;
     if (!text) return null;
     return JSON.parse(text.trim());
