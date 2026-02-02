@@ -40,7 +40,9 @@ import {
   Printer,
   ShieldCheck,
   Scale,
-  ZapOff
+  ZapOff,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import { AnimalCategory, AnimalProfile, Feed, RationItem, NutrientRequirements } from './types';
 import { BREEDS, FEEDS as INITIAL_FEEDS } from './constants';
@@ -190,6 +192,8 @@ const App: React.FC = () => {
         .badge-success { background: #10b981; color: white; }
         .footer { margin-top: 50px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 20px; }
         .price-note { font-size: 9px; color: #94a3b8; font-style: italic; margin-top: 5px; }
+        .ai-report-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 25px; border-radius: 20px; font-size: 13px; color: #065f46; line-height: 1.7; margin-top: 10px; white-space: pre-wrap; font-weight: 500; }
+        .ai-report-box b, .ai-report-box strong { color: #064e3b; font-weight: 900; }
       </style>
     `;
 
@@ -251,6 +255,13 @@ const App: React.FC = () => {
             </table>
             ${record.priceUpdatedDate ? `<div class="price-note"> * Fiyatlar piyasadan ${record.priceUpdatedDate} tarihinde otomatik olarak alınmıştır.</div>` : ''}
           </div>
+
+          ${record.aiAnalysisReport ? `
+          <div class="section">
+            <div class="section-title">AI Uzman Analiz Raporu</div>
+            <div class="ai-report-box">${record.aiAnalysisReport.replace(/\n/g, '<br/>')}</div>
+          </div>
+          ` : ''}
 
           <div class="section">
             <div class="section-title">Besin Madde Analizi</div>
@@ -349,11 +360,13 @@ const App: React.FC = () => {
   ], [totals, requirements]);
 
   // --- Handlers ---
-  const handleSave = async () => {
+  const handleSave = async (customAdvice?: string) => {
     if (ration.length === 0) return;
     setIsSaving(true);
     try {
       const now = new Date();
+      const reportToSave = customAdvice || aiAdvice || undefined;
+      
       await saveRationRecord({
         timestamp: now.getTime(),
         dateStr: now.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -362,26 +375,57 @@ const App: React.FC = () => {
         ration,
         totals,
         requirements,
-        qualityScore
+        qualityScore,
+        aiAnalysisReport: reportToSave
       });
       await loadHistory();
-      alert(`Rasyon %${qualityScore} kalite skoru ile kaydedildi.`);
+      
+      // Kullanıcı manuel kaydet butonuna bastıysa bildirim ver
+      if (!customAdvice) {
+        alert(`Rasyon %${qualityScore} kalite skoru ile başarıyla arşivlendi.`);
+      }
+      return true;
     } catch (e) {
-      alert("Hata oluştu.");
+      console.error("Save error", e);
+      alert("Kayıt sırasında bir hata oluştu.");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
   const getAdvice = async () => {
-    if (ration.length === 0) return;
+    if (ration.length === 0) {
+        alert("Lütfen önce rasyona yem ekleyin.");
+        return;
+    }
+    
     setIsAiLoading(true);
+    setAiAdvice(null); // Eski analizi temizle
+    
     try {
       const breed = BREEDS.find(b => b.id === profile.breedId);
-      const advice = await getRationAdvice(profile, breed?.name || 'Bilinmeyen', ration, feeds, totals, requirements);
-      setAiAdvice(advice || "Analiz alınamadı.");
+      const advice = await getRationAdvice(
+        profile, 
+        breed?.name || 'Bilinmeyen', 
+        ration, 
+        feeds, 
+        totals, 
+        requirements
+      );
+      
+      if (advice) {
+        setAiAdvice(advice);
+        // "analiz yaptığımda veriye ait analizi veriye kaydet. veriler kaydedilmediyse hem veriyi hem de analiz raporunu kaydet"
+        await handleSave(advice);
+        alert("Analiz tamamlandı ve bu rasyon otomatik olarak arşivlendi.");
+      } else {
+        alert("Analiz raporu oluşturulamadı. Lütfen API bağlantınızı kontrol edin.");
+        setAiAdvice("Analiz raporu alınamadı.");
+      }
     } catch (e) {
-      setAiAdvice("Yapay zeka analizine şu an ulaşılamıyor.");
+      console.error("Advice Error:", e);
+      setAiAdvice("Yapay zeka analizine şu an ulaşılamıyor. Lütfen daha sonra tekrar deneyiniz.");
     } finally {
       setIsAiLoading(false);
     }
@@ -538,7 +582,7 @@ const App: React.FC = () => {
                 </div>
               </section>
 
-              <section className="bg-slate-900 rounded-[2.5rem] p-10 border border-white/5 relative overflow-hidden">
+              <section className="bg-slate-900 rounded-[2.5rem] p-10 border border-white/5 relative overflow-hidden shadow-2xl">
                 {suggestion && (
                   <div className="absolute inset-0 bg-slate-900/98 backdrop-blur-xl z-30 p-10 flex flex-col justify-center animate-in fade-in zoom-in duration-300">
                     <div className="flex items-center gap-4 mb-4"><Star className="w-8 h-8 text-amber-500 fill-amber-500" /><h3 className="text-xl font-black text-white uppercase">Mükemmel Rasyon Önerisi</h3></div>
@@ -547,13 +591,31 @@ const App: React.FC = () => {
                   </div>
                 )}
                 <div className="flex items-center justify-between mb-8 relative z-10">
-                  <div className="flex items-center gap-4"><div className="p-3 bg-emerald-500 rounded-2xl"><Zap className="w-5 h-5 text-white" /></div><h2 className="font-black text-white text-base uppercase">AI DANIŞMANI</h2></div>
+                  <div className="flex items-center gap-4"><div className="p-3 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20"><Zap className="w-5 h-5 text-white" /></div><h2 className="font-black text-white text-base uppercase tracking-tight">AI UZMAN DANIŞMAN</h2></div>
                   <div className="flex gap-3">
-                    <button onClick={requestPerfectSuggestion} disabled={isOptimizing} className="bg-amber-500 text-white p-3 rounded-2xl hover:scale-110 transition-all shadow-lg shadow-amber-500/20">{isOptimizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Star className="w-5 h-5" />}</button>
-                    <button onClick={getAdvice} disabled={isAiLoading} className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase transition-all hover:bg-emerald-400">Analiz Et</button>
+                    <button onClick={requestPerfectSuggestion} disabled={isOptimizing} className="bg-amber-500 text-white p-3 rounded-2xl hover:scale-110 active:scale-95 transition-all shadow-lg shadow-amber-500/20" title="Mükemmel Rasyon Önerisi">{isOptimizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Star className="w-5 h-5" />}</button>
+                    <button 
+                      onClick={getAdvice} 
+                      disabled={isAiLoading || ration.length === 0} 
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-2xl font-black text-[11px] uppercase transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {isAiLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      Analiz Et & Arşivle
+                    </button>
                   </div>
                 </div>
-                {aiAdvice ? <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 text-slate-300 text-sm whitespace-pre-wrap leading-relaxed italic">{aiAdvice}</div> : <div className="text-center py-10 text-slate-500 text-xs font-bold uppercase tracking-widest">Profesyonel rasyon analizi için yukarıdaki butonu kullanın.</div>}
+                {aiAdvice ? (
+                  <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 text-slate-300 text-sm whitespace-pre-wrap leading-relaxed italic animate-in slide-in-from-bottom-4 duration-500 max-h-[400px] overflow-y-auto scrollbar-hide">
+                    {aiAdvice}
+                  </div>
+                ) : (
+                  <div className="text-center py-16 flex flex-col items-center gap-4 group">
+                    <div className="p-4 bg-white/5 rounded-full border border-white/5 group-hover:bg-white/10 transition-colors">
+                      <MessageSquare className="w-10 h-10 text-slate-600 group-hover:text-emerald-500 transition-colors" />
+                    </div>
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] max-w-[200px]">Rasyonunuzu analiz etmek için yukarıdaki butonu kullanın.</p>
+                  </div>
+                )}
               </section>
             </div>
           </div>
@@ -565,9 +627,9 @@ const App: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {feeds.map(feed => (
-                <div key={feed.id} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
+                <div key={feed.id} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
                   <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">{feed.id}</p>
-                  <h4 className="font-black text-slate-800 text-lg mb-6 border-b pb-4">{feed.name}</h4>
+                  <h4 className="font-black text-slate-800 text-lg mb-6 border-b pb-4 group-hover:text-emerald-600 transition-colors">{feed.name}</h4>
                   <div className="flex items-baseline gap-1.5"><span className="text-2xl font-black text-emerald-600">{feed.pricePerKg.toFixed(2)}</span><span className="text-xs font-bold text-slate-400">₺/kg</span></div>
                 </div>
               ))}
@@ -579,8 +641,11 @@ const App: React.FC = () => {
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               <h2 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4"><Archive className="w-10 h-10 text-emerald-600" /> Kayıtlı Arşiv</h2>
               <div className="flex items-center gap-3 bg-white p-2 rounded-[2rem] shadow-xl border border-slate-100">
-                <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-600 transition-all"><Download className="w-4 h-4" /> Yedekle</button>
-                <label className="flex items-center gap-2 px-6 py-3 bg-emerald-50 text-emerald-700 rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-100 transition-all cursor-pointer"><Upload className="w-4 h-4" /> {isBackupLoading ? 'Yükleniyor...' : 'Geri Yükle'}<input type="file" accept=".json" onChange={handleImport} className="hidden" /></label>
+                <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-600 transition-all shadow-md active:scale-95"><Download className="w-4 h-4" /> Yedekle</button>
+                <label className="flex items-center gap-2 px-6 py-3 bg-emerald-50 text-emerald-700 rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-100 transition-all cursor-pointer shadow-sm active:scale-95">
+                  <Upload className="w-4 h-4" /> {isBackupLoading ? 'Yükleniyor...' : 'Geri Yükle'}
+                  <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+                </label>
               </div>
             </div>
 
@@ -594,8 +659,8 @@ const App: React.FC = () => {
                         <h3 className="font-black text-lg">{record.profile.category} - {BREEDS.find(b => b.id === record.profile.breedId)?.name}</h3>
                       </div>
                       <div className="flex gap-2">
-                         <button onClick={() => handlePrint(record)} className="p-2.5 bg-white/10 hover:bg-emerald-500/20 text-white rounded-xl transition-all" title="PDF Çıktısı"><Printer className="w-4 h-4" /></button>
-                         <button onClick={() => record.id && handleDeleteRecord(record.id)} className="p-2.5 bg-white/10 hover:bg-red-500/20 text-white rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                         <button onClick={() => handlePrint(record)} className="p-2.5 bg-white/10 hover:bg-emerald-500/20 text-white rounded-xl transition-all" title="PDF Raporu Al"><Printer className="w-4 h-4" /></button>
+                         <button onClick={() => record.id && handleDeleteRecord(record.id)} className="p-2.5 bg-white/10 hover:bg-red-500/20 text-white rounded-xl transition-all" title="Kaydı Sil"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </div>
                     
@@ -610,7 +675,7 @@ const App: React.FC = () => {
                         <div className="bg-slate-50 p-4 rounded-3xl border">
                           <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Performans</span>
                           <div className={`text-xl font-black ${getScoreColor(record.qualityScore || 0).split(' ')[0]}`}>%{record.qualityScore}</div>
-                          <div className="text-[10px] font-bold text-slate-400">Kalite Skoru</div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase">Kalite Skoru</div>
                         </div>
                       </div>
 
@@ -626,13 +691,33 @@ const App: React.FC = () => {
                         </div>
                       </div>
 
+                      {record.aiAnalysisReport && (
+                        <div className="space-y-2">
+                           <span className="text-[9px] font-black text-emerald-600 uppercase block tracking-widest flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> AI Uzman Analizi Kayıtlı</span>
+                           <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 leading-relaxed italic max-h-24 overflow-y-auto scrollbar-hide">
+                             {record.aiAnalysisReport}
+                           </div>
+                        </div>
+                      )}
+
                       <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex flex-col">
                            <span className="text-[9px] font-black text-slate-400 uppercase">Toplam Maliyet</span>
                            <span className="font-black text-emerald-600 text-2xl tracking-tighter">{record.totals.cost.toFixed(2)} ₺</span>
-                           {record.priceUpdatedDate && <span className="text-[8px] text-slate-300 font-bold uppercase mt-1">Fiyat: {record.priceUpdatedDate}</span>}
+                           {record.priceUpdatedDate && <span className="text-[8px] text-slate-300 font-bold uppercase mt-1">Fiyat Endeksi: {record.priceUpdatedDate}</span>}
                         </div>
-                        <button onClick={() => { setProfile(record.profile); setRation(record.ration); setActiveTab('calculator'); if(record.priceUpdatedDate) setPriceUpdatedDate(record.priceUpdatedDate); }} className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all">Yükle</button>
+                        <button 
+                          onClick={() => { 
+                            setProfile(record.profile); 
+                            setRation(record.ration); 
+                            setAiAdvice(record.aiAnalysisReport || null); 
+                            setActiveTab('calculator'); 
+                            if(record.priceUpdatedDate) setPriceUpdatedDate(record.priceUpdatedDate); 
+                          }} 
+                          className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all active:scale-95"
+                        >
+                          Düzenle / Yükle
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -640,9 +725,11 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-                <FileText className="w-16 h-16 text-slate-200 mb-6" />
-                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Henüz Kayıtlı Rasyon Bulunmuyor</p>
-                <button onClick={() => setActiveTab('calculator')} className="mt-8 bg-slate-900 text-white px-10 py-4 rounded-3xl font-black text-xs uppercase hover:bg-emerald-600 transition-all">Yeni Rasyon Oluştur</button>
+                <div className="p-8 bg-slate-50 rounded-full mb-6">
+                  <FileText className="w-12 h-12 text-slate-200" />
+                </div>
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Arşiviniz Boş Görünüyor</p>
+                <button onClick={() => setActiveTab('calculator')} className="mt-8 bg-slate-900 text-white px-10 py-4 rounded-3xl font-black text-xs uppercase hover:bg-emerald-600 transition-all shadow-lg active:scale-95">Yeni Rasyon Planla</button>
               </div>
             )}
           </div>
@@ -654,12 +741,12 @@ const App: React.FC = () => {
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-lg">
           <div className="bg-white/95 backdrop-blur-xl px-10 py-5 rounded-[2.5rem] shadow-2xl border border-emerald-100/50 flex items-center justify-between">
              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-black text-slate-400 uppercase">Rasyon Skoru</span><div className={`px-2 py-0.5 rounded-md text-[8px] font-black border ${getScoreColor(qualityScore)}`}>%{qualityScore}</div></div>
-                <div className="flex items-baseline gap-1.5"><span className="text-3xl font-black text-slate-900 tabular-nums">{ration.reduce((a, b) => a + b.amountKg, 0).toFixed(1)}</span><span className="text-xs font-black text-slate-400 uppercase">KG</span></div>
+                <div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-black text-slate-400 uppercase">Anlık Skor</span><div className={`px-2 py-0.5 rounded-md text-[8px] font-black border ${getScoreColor(qualityScore)}`}>%{qualityScore}</div></div>
+                <div className="flex items-baseline gap-1.5"><span className="text-3xl font-black text-slate-900 tabular-nums">{ration.reduce((a, b) => a + b.amountKg, 0).toFixed(1)}</span><span className="text-xs font-black text-slate-400 uppercase">KG Toplam</span></div>
              </div>
              <div className="flex gap-4">
-                <button onClick={() => setActiveTab('history')} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 shadow-sm"><Archive className="w-6 h-6" /></button>
-                <button onClick={handleSave} disabled={isSaving || ration.length === 0} className="flex items-center gap-3 bg-slate-900 text-white px-10 py-5 rounded-[1.75rem] font-black text-[11px] hover:bg-emerald-600 transition-all uppercase shadow-lg shadow-slate-900/20">
+                <button onClick={() => setActiveTab('history')} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 shadow-sm active:scale-95"><Archive className="w-6 h-6" /></button>
+                <button onClick={() => handleSave()} disabled={isSaving || ration.length === 0} className="flex items-center gap-3 bg-slate-900 text-white px-10 py-5 rounded-[1.75rem] font-black text-[11px] hover:bg-emerald-600 transition-all uppercase shadow-lg shadow-slate-900/20 active:scale-95 disabled:opacity-50">
                   <Save className={`w-4 h-4 ${isSaving ? 'animate-pulse' : ''}`} /> Kaydet
                 </button>
              </div>
@@ -669,7 +756,7 @@ const App: React.FC = () => {
 
       {activeTab !== 'calculator' && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60]">
-          <button onClick={() => setActiveTab('calculator')} className="flex items-center gap-4 bg-slate-900 text-white px-10 py-5 rounded-[2.5rem] font-black text-[11px] hover:bg-emerald-600 transition-all shadow-2xl uppercase tracking-widest border border-white/5">
+          <button onClick={() => setActiveTab('calculator')} className="flex items-center gap-4 bg-slate-900 text-white px-10 py-5 rounded-[2.5rem] font-black text-[11px] hover:bg-emerald-600 transition-all shadow-2xl uppercase tracking-widest border border-white/5 active:scale-95">
             <LayoutDashboard className="w-5 h-5 text-emerald-400" /> Planlayıcıya Dön
           </button>
         </div>
