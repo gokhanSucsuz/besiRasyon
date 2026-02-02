@@ -41,10 +41,15 @@ export const FEEDS: Feed[] = [
   // Enerji Yemleri (Kesif)
   { id: 'corn', name: 'Mısır (Tane)', dryMatter: 88, metabolizableEnergy: 13.5, crudeProtein: 9.0, calcium: 0.02, phosphorus: 0.30, pricePerKg: 9.2 },
   { id: 'barley', name: 'Arpa (Tane)', dryMatter: 88, metabolizableEnergy: 12.5, crudeProtein: 11.5, calcium: 0.05, phosphorus: 0.35, pricePerKg: 8.5 },
+  { id: 'rolled_barley', name: 'Arpa Ezmesi', dryMatter: 88, metabolizableEnergy: 12.6, crudeProtein: 11.5, calcium: 0.05, phosphorus: 0.35, pricePerKg: 9.0 },
   { id: 'wheat', name: 'Buğday (Tane)', dryMatter: 89, metabolizableEnergy: 13.2, crudeProtein: 12.5, calcium: 0.05, phosphorus: 0.40, pricePerKg: 9.8 },
   { id: 'oats', name: 'Yulaf', dryMatter: 89, metabolizableEnergy: 11.5, crudeProtein: 11.0, calcium: 0.10, phosphorus: 0.35, pricePerKg: 8.8 },
   { id: 'molasses', name: 'Melas (Şeker Pancarı)', dryMatter: 75, metabolizableEnergy: 12.0, crudeProtein: 6.0, calcium: 0.80, phosphorus: 0.05, pricePerKg: 6.5 },
   { id: 'sorghum', name: 'Sorgum', dryMatter: 89, metabolizableEnergy: 12.8, crudeProtein: 10.0, calcium: 0.04, phosphorus: 0.32, pricePerKg: 8.2 },
+
+  // Karma / Konsantre Yemler
+  { id: 'beef_concentrate', name: 'Besi Konsantre Yemi (Standart)', dryMatter: 88, metabolizableEnergy: 11.8, crudeProtein: 14.0, calcium: 1.00, phosphorus: 0.50, pricePerKg: 10.8 },
+  { id: 'dairy_concentrate', name: 'Süt Konsantre Yemi', dryMatter: 88, metabolizableEnergy: 12.0, crudeProtein: 18.0, calcium: 1.20, phosphorus: 0.60, pricePerKg: 11.5 },
 
   // Protein Yemleri (Küspeler)
   { id: 'soybean_meal', name: 'Soya Küspesi (%44)', dryMatter: 90, metabolizableEnergy: 13.0, crudeProtein: 44.0, calcium: 0.30, phosphorus: 0.65, pricePerKg: 19.5 },
