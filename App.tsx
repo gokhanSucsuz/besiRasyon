@@ -38,7 +38,8 @@ import {
   BookOpen,
   MousePointer2,
   Cpu,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { AnimalCategory, AnimalProfile, Feed, RationItem, NutrientRequirements } from './types';
 import { BREEDS, FEEDS as INITIAL_FEEDS } from './constants';
@@ -98,9 +99,9 @@ const App: React.FC = () => {
   });
 
   const [ration, setRation] = useState<RationItem[]>([
-    { feedId: 'corn_silage', amountKg: 15 },
-    { feedId: 'alfalfa_hay', amountKg: 3 },
-    { feedId: 'barley', amountKg: 4 },
+    { feedId: 'corn_silage', amountKg: 4 },
+    { feedId: 'alfalfa_hay', amountKg: 2 },
+    { feedId: 'barley', amountKg: 2 },
   ]);
 
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
@@ -169,12 +170,12 @@ const App: React.FC = () => {
   }, [profile]);
 
   const totals = useMemo(() => {
-    let dm = 0, energy = 0, protein = 0, ca = 0, p = 0, mg = 0, na = 0, bicarb = 0, cost = 0;
+    let dm = 0, energy = 0, protein = 0, ca = 0, p = 0, mg = 0, na = 0, bicarb = 0, cost = 0, totalKg = 0;
     ration.forEach(item => {
       const feed = feeds.find(f => f.id === item.feedId);
       if (feed) {
-        // Miktar NaN veya negatifse 0 kabul et
         const safeAmount = isNaN(item.amountKg) || item.amountKg < 0 ? 0 : item.amountKg;
+        totalKg += safeAmount;
         const itemDM = safeAmount * (feed.dryMatter / 100);
         dm += itemDM;
         energy += itemDM * feed.metabolizableEnergy;
@@ -187,7 +188,7 @@ const App: React.FC = () => {
         cost += safeAmount * feed.pricePerKg;
       }
     });
-    return { dm, energy, protein, ca, p, mg, na, bicarb, cost };
+    return { dm, energy, protein, ca, p, mg, na, bicarb, cost, totalKg };
   }, [ration, feeds]);
 
   const qualityScore = useMemo(() => {
@@ -217,6 +218,8 @@ const App: React.FC = () => {
     { name: 'Magnezyum (g)', Mevcut: totals.mg, Gereken: requirements.magnesium },
     { name: 'Sodyum (g)', Mevcut: totals.na, Gereken: requirements.sodium },
   ], [totals, requirements]);
+
+  const isLimitExceeded = profile.category === AnimalCategory.CATTLE && totals.totalKg > 9.0;
 
   const handleExport = async () => {
     try {
@@ -346,7 +349,6 @@ const App: React.FC = () => {
       const optimizedItems = await optimizeRationAmounts(profile, breed?.name || 'Bilinmeyen', ration, feeds, requirements);
       
       if (optimizedItems && Array.isArray(optimizedItems)) {
-        // AI'dan gelen verileri doğrula (NaN veya geçersiz sayı kontrolü)
         const isValid = optimizedItems.every(item => 
           item.feedId && 
           typeof item.amountKg === 'number' && 
@@ -358,14 +360,14 @@ const App: React.FC = () => {
           setRation(optimizedItems);
           alert("Rasyon miktarları besin ihtiyaçlarını %100'e yaklaştıracak şekilde Gemini tarafından güncellendi.");
         } else {
-          throw new Error("Yapay zeka geçersiz veya eksik sayısal değerler döndürdü.");
+          throw new Error("Yapay zeka geçersiz değerler döndürdü.");
         }
       } else {
-        throw new Error("Yapay zeka optimizasyon sonuçlarını oluşturamadı.");
+        throw new Error("Optimizasyon sonuçları oluşturulamadı.");
       }
     } catch (e: any) {
       console.error("Optimizasyon Hatası:", e);
-      alert(`HATA: Optimizasyon başarısız oldu. ${e.message || 'Lütfen mevcut bileşenleri kontrol edin veya tekrar deneyin.'}`);
+      alert(`HATA: Optimizasyon başarısız oldu. ${e.message || 'Lütfen tekrar deneyin.'}`);
     } finally {
       setIsOptimizing(false);
     }
@@ -376,7 +378,6 @@ const App: React.FC = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    // Dinamik HTML Grafik Hazırlığı
     const currentChartData = [
       { name: 'KM (kg)', Mevcut: record.totals.dm, Gereken: record.requirements.dryMatterIntake },
       { name: 'Enerji (MJ)', Mevcut: record.totals.energy, Gereken: record.requirements.energy },
@@ -444,14 +445,6 @@ const App: React.FC = () => {
             </tbody>
           </table>
           
-          ${record.aiAnalysisReports && record.aiAnalysisReports.length > 0 ? `
-          <div class="page-break"></div>
-          <div class="section-title" style="margin-top:30px;">Yapay Zeka Uzman Analiz Raporları</div>
-          ${record.aiAnalysisReports.map((rep, i) => `
-            <div style="font-weight: bold; margin-bottom: 8px; font-size: 12px; color: #64748b;">Analiz Raporu #${i+1}</div>
-            <div class="ai-report">${rep}</div>
-          `).join('')}
-          ` : ''}
           <script>window.print(); setTimeout(() => window.close(), 500);</script>
         </body>
       </html>
@@ -553,18 +546,25 @@ const App: React.FC = () => {
                   ))}
                 </div>
                 
+                {profile.category === AnimalCategory.CATTLE && (
+                  <div className={`p-4 rounded-2xl flex items-center gap-3 text-[11px] font-bold ${isLimitExceeded ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                    {isLimitExceeded ? <AlertTriangle className="w-4 h-4" /> : <InfoLabel label="Sınır Bilgisi" tooltip="Büyükbaş rasyonlarında tek öğün toplam miktarı 9.0 kg ile sınırlandırılmıştır." className="!text-blue-600" />}
+                    <span>Büyükbaş rasyonu için toplam miktar sınırı: <b>9.0 kg</b></span>
+                  </div>
+                )}
+
                 {ration.length > 0 && (
-                  <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center bg-emerald-50/50 p-6 rounded-[2rem] border border-emerald-100/50 animate-in slide-in-from-bottom-2 duration-500">
+                  <div className={`mt-4 pt-6 border-t border-slate-100 flex justify-between items-center p-6 rounded-[2rem] border transition-all ${isLimitExceeded ? 'bg-red-50 border-red-200 shadow-lg shadow-red-100' : 'bg-emerald-50/50 border-emerald-100/50'}`}>
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">Rasyon Maliyet Özeti</span>
-                      <span className="text-[11px] text-slate-400 font-bold leading-tight max-w-[140px]">Günlük hayvan başına düşen toplam kaba ve kesif yem maliyetidir.</span>
+                      <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${isLimitExceeded ? 'text-red-500' : 'text-slate-500'}`}>Rasyon Maliyet Özeti</span>
+                      <span className="text-[11px] text-slate-400 font-bold leading-tight max-w-[140px]">Günlük hayvan başına düşen toplam maliyettir.</span>
                     </div>
                     <div className="text-right flex flex-col items-end">
-                      <div className="flex items-baseline gap-1.5 text-emerald-700">
+                      <div className={`flex items-baseline gap-1.5 ${isLimitExceeded ? 'text-red-600' : 'text-emerald-700'}`}>
                         <span className="text-3xl font-black tracking-tighter">{isNaN(totals.cost) ? "0.00" : totals.cost.toFixed(2)}</span>
                         <span className="text-sm font-black uppercase tracking-widest opacity-80">₺</span>
                       </div>
-                      <span className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest mt-0.5">Hayvan / Günlük</span>
+                      <span className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${isLimitExceeded ? 'text-red-400' : 'text-emerald-600/60'}`}>Hayvan / Günlük</span>
                     </div>
                   </div>
                 )}
@@ -696,36 +696,6 @@ const App: React.FC = () => {
                         <div className="bg-slate-50 p-3 rounded-2xl text-center"><span className="block text-[8px] font-black text-slate-400 uppercase">Maliyet</span><span className="font-black text-emerald-600">{record.totals.cost.toFixed(1)} ₺</span></div>
                         <div className="bg-slate-50 p-3 rounded-2xl text-center"><span className="block text-[8px] font-black text-slate-400 uppercase">Skor</span><span className="font-black text-blue-600">%{record.qualityScore}</span></div>
                       </div>
-                      
-                      {record.aiAnalysisReports && record.aiAnalysisReports.length > 0 && (
-                        <div className="space-y-2">
-                          <button 
-                            onClick={() => setExpandedReportId(expandedReportId === record.id ? null : record.id!)}
-                            className="w-full p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 font-black flex items-center justify-between hover:bg-emerald-100 transition-colors shadow-sm"
-                          >
-                            <span className="flex items-center gap-2">
-                              <Sparkles className="w-3.5 h-3.5" /> 
-                              {record.aiAnalysisReports.length} analiz raporu mevcut
-                            </span>
-                            {expandedReportId === record.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </button>
-                          
-                          {expandedReportId === record.id && (
-                            <div className="max-h-[300px] overflow-y-auto space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-200 animate-in slide-in-from-top-2 duration-300 scrollbar-hide shadow-inner">
-                              {record.aiAnalysisReports.map((rep, idx) => (
-                                <div key={idx} className="text-[11px] text-slate-600 italic border-b border-slate-200 pb-3 last:border-0 last:pb-0">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="font-black uppercase text-[8px] text-emerald-600">Analiz Raporu #{idx+1}</span>
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                                  </div>
-                                  <div className="whitespace-pre-wrap leading-relaxed">{rep}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
                       <button 
                         onClick={() => { 
                           setProfile(record.profile); 
@@ -798,7 +768,10 @@ const App: React.FC = () => {
           <div className="bg-white/95 backdrop-blur-xl px-10 py-5 rounded-[2.5rem] shadow-2xl border border-emerald-100/50 flex items-center justify-between">
              <div className="flex flex-col">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Toplam Karışım</span>
-                <span className="text-3xl font-black text-slate-900">{isNaN(ration.reduce((a,b)=>a+b.amountKg, 0)) ? 0.0 : ration.reduce((a,b)=>a+b.amountKg, 0).toFixed(1)} <span className="text-xs text-slate-400">KG</span></span>
+                <span className={`text-3xl font-black ${isLimitExceeded ? 'text-red-600' : 'text-slate-900'}`}>
+                  {isNaN(totals.totalKg) ? 0.0 : totals.totalKg.toFixed(1)} 
+                  <span className="text-xs text-slate-400 ml-1">KG</span>
+                </span>
              </div>
              <div className="flex gap-3">
                 <button onClick={() => { setActiveTab('history'); setCurrentRecordId(null); }} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 active:scale-95 shadow-sm" title="Arşive Git"><Archive className="w-6 h-6" /></button>

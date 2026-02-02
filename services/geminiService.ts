@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AnimalProfile, Feed, RationItem } from '../types';
+import { AnimalCategory, AnimalProfile, Feed, RationItem } from '../types';
 
 /**
  * Mevcut rasyonu analiz eden ve tavsiyeler sunan fonksiyon.
@@ -82,6 +82,12 @@ export const optimizeRationAmounts = async (
       return `${f?.id}: ${f?.name} (KM: %${f?.dryMatter}, ME: ${f?.metabolizableEnergy}, HP: %${f?.crudeProtein})`;
     }).join('\n');
 
+    // Büyükbaş kısıtlaması ekleniyor
+    const isCattle = profile.category === AnimalCategory.CATTLE;
+    const limitInstruction = isCattle 
+      ? "ÖNEMLİ KISITLAMA: Bu bir BÜYÜKBAŞ rasyonudur. Tüm bileşenlerin toplam ağırlığı (fresh weight) KESİNLİKLE 9.0 kg'ı geçmemelidir. Miktarları bu 9kg sınırına sadık kalarak, besin ihtiyaçlarını en iyi karşılayacak şekilde optimize et."
+      : "";
+
     const prompt = `
       Sen bir zooteknist rasyon optimizasyon motorusun. Sadece belirtilen yemleri kullanarak besin ihtiyaçlarını %100'e en yakın hale getirecek miktarları belirle.
       HAYVAN: ${profile.category} - ${breedName} (${profile.weight} kg)
@@ -89,10 +95,13 @@ export const optimizeRationAmounts = async (
       KULLANILACAK YEMLER VE ÖZELLİKLERİ:
       ${availableFeeds}
       
+      ${limitInstruction}
+
       KURALLAR:
       1. Sadece belirtilen yem ID'lerini kullan.
       2. amountKg değerleri mutlaka pozitif ve sonlu birer sayı olmalıdır (NaN veya null olamaz).
       3. Toplam Kuru Madde (KM) hedefi aşılmamalıdır.
+      4. ${isCattle ? "Büyükbaş için TOPLAM MİKTAR <= 9.0 kg kuralına uy." : ""}
       
       Çıktı SADECE geçerli bir JSON objesi olmalıdır: {"items": [{"feedId": "id", "amountKg": pozitif_sayı}]}
     `;
