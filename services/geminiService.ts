@@ -83,11 +83,18 @@ export const optimizeRationAmounts = async (
     }).join('\n');
 
     const prompt = `
-      Sadece belirtilen yemleri kullanarak, besin ihtiyaçlarını en iyi karşılayacak MİKTARLARI (kg) belirle.
+      Sen bir zooteknist rasyon optimizasyon motorusun. Sadece belirtilen yemleri kullanarak besin ihtiyaçlarını %100'e en yakın hale getirecek miktarları belirle.
       HAYVAN: ${profile.category} - ${breedName} (${profile.weight} kg)
-      İHTİYAÇLAR: KM: ${requirements.dryMatterIntake.toFixed(2)}kg, Enerji: ${requirements.energy.toFixed(2)}MJ, Protein: ${requirements.protein.toFixed(2)}g
-      KULLANILACAK YEMLER: ${availableFeeds}
-      Çıktı SADECE JSON: {"items": [{"feedId": "id", "amountKg": sayı}]}
+      HEDEF İHTİYAÇLAR: KM: ${requirements.dryMatterIntake.toFixed(2)}kg, Enerji: ${requirements.energy.toFixed(2)}MJ, Protein: ${requirements.protein.toFixed(2)}g
+      KULLANILACAK YEMLER VE ÖZELLİKLERİ:
+      ${availableFeeds}
+      
+      KURALLAR:
+      1. Sadece belirtilen yem ID'lerini kullan.
+      2. amountKg değerleri mutlaka pozitif ve sonlu birer sayı olmalıdır (NaN veya null olamaz).
+      3. Toplam Kuru Madde (KM) hedefi aşılmamalıdır.
+      
+      Çıktı SADECE geçerli bir JSON objesi olmalıdır: {"items": [{"feedId": "id", "amountKg": pozitif_sayı}]}
     `;
 
     const response = await ai.models.generateContent({
@@ -105,16 +112,20 @@ export const optimizeRationAmounts = async (
                 properties: {
                   feedId: { type: Type.STRING },
                   amountKg: { type: Type.NUMBER }
-                }
+                },
+                required: ["feedId", "amountKg"]
               }
             }
-          }
+          },
+          required: ["items"]
         }
       }
     });
 
     const text = response.text;
-    return text ? JSON.parse(text).items : null;
+    if (!text) return null;
+    const parsed = JSON.parse(text);
+    return parsed.items || null;
   } catch (error) {
     console.error("Optimizasyon Hatası:", error);
     return null;

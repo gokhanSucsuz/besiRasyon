@@ -61,6 +61,7 @@ const InfoLabel: React.FC<{ label: string; tooltip: string; className?: string }
 );
 
 const getScoreColor = (score: number) => {
+  if (isNaN(score)) return 'bg-slate-50 text-slate-400 border-slate-200';
   if (score >= 90) return 'bg-emerald-50 text-emerald-600 border-emerald-200';
   if (score >= 75) return 'bg-blue-50 text-blue-600 border-blue-200';
   if (score >= 50) return 'bg-amber-50 text-amber-600 border-amber-200';
@@ -157,7 +158,7 @@ const App: React.FC = () => {
     const naReq = dmi * 1.2; 
 
     return {
-      dryMatterIntake: dmi,
+      dryMatterIntake: dmi > 0 ? dmi : 0.1,
       energy: maintenanceEnergy + gainEnergy,
       protein: maintenanceProtein + gainProtein,
       calcium: (profile.weight * 0.05) + (profile.dailyGain * 15),
@@ -172,7 +173,9 @@ const App: React.FC = () => {
     ration.forEach(item => {
       const feed = feeds.find(f => f.id === item.feedId);
       if (feed) {
-        const itemDM = item.amountKg * (feed.dryMatter / 100);
+        // Miktar NaN veya negatifse 0 kabul et
+        const safeAmount = isNaN(item.amountKg) || item.amountKg < 0 ? 0 : item.amountKg;
+        const itemDM = safeAmount * (feed.dryMatter / 100);
         dm += itemDM;
         energy += itemDM * feed.metabolizableEnergy;
         protein += itemDM * (feed.crudeProtein / 100) * 1000;
@@ -181,7 +184,7 @@ const App: React.FC = () => {
         mg += itemDM * (feed.magnesium / 100) * 1000;
         na += itemDM * (feed.sodium / 100) * 1000;
         bicarb += itemDM * (feed.bicarbonate / 100) * 1000;
-        cost += item.amountKg * feed.pricePerKg;
+        cost += safeAmount * feed.pricePerKg;
       }
     });
     return { dm, energy, protein, ca, p, mg, na, bicarb, cost };
@@ -190,7 +193,7 @@ const App: React.FC = () => {
   const qualityScore = useMemo(() => {
     if (ration.length === 0) return 0;
     const calculatePartScore = (current: number, required: number) => {
-      if (required === 0) return 100;
+      if (!required || required <= 0 || isNaN(current)) return 0;
       const deviation = Math.abs(current - required) / required;
       return Math.max(0, 100 * (1 - deviation));
     };
@@ -200,7 +203,9 @@ const App: React.FC = () => {
     const caScore = totals.ca >= requirements.calcium ? 100 : (totals.ca / requirements.calcium) * 100;
     const pScore = totals.p >= requirements.phosphorus ? 100 : (totals.p / requirements.phosphorus) * 100;
     const mgScore = totals.mg >= requirements.magnesium ? 100 : (totals.mg / requirements.magnesium) * 100;
-    return Math.round((dmScore + energyScore + proteinScore + caScore + pScore + mgScore) / 6);
+    
+    const avg = (dmScore + energyScore + proteinScore + caScore + pScore + mgScore) / 6;
+    return isNaN(avg) ? 0 : Math.round(avg);
   }, [totals, requirements, ration]);
 
   const chartData = useMemo(() => [
@@ -339,14 +344,28 @@ const App: React.FC = () => {
     try {
       const breed = BREEDS.find(b => b.id === profile.breedId);
       const optimizedItems = await optimizeRationAmounts(profile, breed?.name || 'Bilinmeyen', ration, feeds, requirements);
-      if (optimizedItems) {
-        setRation(optimizedItems);
-        alert("Rasyon miktarları besin ihtiyaçlarını %100'e yaklaştıracak şekilde Gemini tarafından güncellendi.");
+      
+      if (optimizedItems && Array.isArray(optimizedItems)) {
+        // AI'dan gelen verileri doğrula (NaN veya geçersiz sayı kontrolü)
+        const isValid = optimizedItems.every(item => 
+          item.feedId && 
+          typeof item.amountKg === 'number' && 
+          !isNaN(item.amountKg) && 
+          item.amountKg >= 0
+        );
+
+        if (isValid) {
+          setRation(optimizedItems);
+          alert("Rasyon miktarları besin ihtiyaçlarını %100'e yaklaştıracak şekilde Gemini tarafından güncellendi.");
+        } else {
+          throw new Error("Yapay zeka geçersiz veya eksik sayısal değerler döndürdü.");
+        }
       } else {
-        alert("Optimizasyon yapılamadı. Lütfen bileşenleri kontrol edin.");
+        throw new Error("Yapay zeka optimizasyon sonuçlarını oluşturamadı.");
       }
-    } catch (e) {
-      alert("Bir hata oluştu.");
+    } catch (e: any) {
+      console.error("Optimizasyon Hatası:", e);
+      alert(`HATA: Optimizasyon başarısız oldu. ${e.message || 'Lütfen mevcut bileşenleri kontrol edin veya tekrar deneyin.'}`);
     } finally {
       setIsOptimizing(false);
     }
@@ -467,7 +486,7 @@ const App: React.FC = () => {
           </div>
           {activeTab === 'calculator' && (
             <div className={`px-6 py-2 rounded-2xl border font-black hidden md:block transition-all shadow-sm ${getScoreColor(qualityScore)}`}>
-              Rasyon Skoru: %{qualityScore}
+              Rasyon Skoru: %{isNaN(qualityScore) ? 0 : qualityScore}
             </div>
           )}
         </div>
@@ -542,7 +561,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="text-right flex flex-col items-end">
                       <div className="flex items-baseline gap-1.5 text-emerald-700">
-                        <span className="text-3xl font-black tracking-tighter">{totals.cost.toFixed(2)}</span>
+                        <span className="text-3xl font-black tracking-tighter">{isNaN(totals.cost) ? "0.00" : totals.cost.toFixed(2)}</span>
                         <span className="text-sm font-black uppercase tracking-widest opacity-80">₺</span>
                       </div>
                       <span className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest mt-0.5">Hayvan / Günlük</span>
@@ -572,10 +591,10 @@ const App: React.FC = () => {
                   </ResponsiveContainer>
                 </div>
                 <div className="grid grid-cols-4 gap-4 mt-8">
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">KM (kg)</span><span className="text-lg font-black text-slate-800">{totals.dm.toFixed(1)} / {requirements.dryMatterIntake.toFixed(1)}</span></div>
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Magnezyum</span><span className="text-lg font-black text-slate-800">{totals.mg.toFixed(1)} g</span></div>
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Bikarbonat</span><span className="text-lg font-black text-slate-800">{totals.bicarb.toFixed(1)} g</span></div>
-                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Sodyum</span><span className="text-lg font-black text-slate-800">{totals.na.toFixed(1)} g</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">KM (kg)</span><span className="text-lg font-black text-slate-800">{isNaN(totals.dm) ? 0 : totals.dm.toFixed(1)} / {requirements.dryMatterIntake.toFixed(1)}</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Magnezyum</span><span className="text-lg font-black text-slate-800">{isNaN(totals.mg) ? 0 : totals.mg.toFixed(1)} g</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Bikarbonat</span><span className="text-lg font-black text-slate-800">{isNaN(totals.bicarb) ? 0 : totals.bicarb.toFixed(1)} g</span></div>
+                  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="block text-[8px] font-black text-slate-400 uppercase">Sodyum</span><span className="text-lg font-black text-slate-800">{isNaN(totals.na) ? 0 : totals.na.toFixed(1)} g</span></div>
                 </div>
               </section>
 
@@ -779,7 +798,7 @@ const App: React.FC = () => {
           <div className="bg-white/95 backdrop-blur-xl px-10 py-5 rounded-[2.5rem] shadow-2xl border border-emerald-100/50 flex items-center justify-between">
              <div className="flex flex-col">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Toplam Karışım</span>
-                <span className="text-3xl font-black text-slate-900">{ration.reduce((a,b)=>a+b.amountKg, 0).toFixed(1)} <span className="text-xs text-slate-400">KG</span></span>
+                <span className="text-3xl font-black text-slate-900">{isNaN(ration.reduce((a,b)=>a+b.amountKg, 0)) ? 0.0 : ration.reduce((a,b)=>a+b.amountKg, 0).toFixed(1)} <span className="text-xs text-slate-400">KG</span></span>
              </div>
              <div className="flex gap-3">
                 <button onClick={() => { setActiveTab('history'); setCurrentRecordId(null); }} className="p-5 bg-slate-100 text-slate-500 rounded-[1.75rem] transition-all hover:bg-emerald-50 active:scale-95 shadow-sm" title="Arşive Git"><Archive className="w-6 h-6" /></button>
